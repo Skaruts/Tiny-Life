@@ -1,9 +1,9 @@
 ## Todo:
 
 - [ ] fix rect/circle proportional mode (it's broken when the mouse pos < origin)
-- [ ] add a cycle-zoom button
-- [ ] change the debug key
-
+- [x] add a cycle-zoom button
+- [x] make zoom persistent
+- [x] change the debug key (changed to `~` (or `\` in some keyboards I guess))
 - [ ] add speed functionality
 - [ ] add a rounded mode to brush tool
 - [ ] could the fill tool be made to not recompute every frame? (maybe give tools control over 'tl.clear')
@@ -11,12 +11,12 @@
 - [ ] figure out Hashlife (eventually)
 
 ## Bugs:
-- filled ellipses are completely screwed because of the gaps (or maybe also because of the choice in fill algo - does it go through diagonal pixels?)
 - if a rect being drawn in proportional mode touches screen edges, it moves the excess size to the other side
 - mouse cursor cell shouldn't be drawn when using pattern tool? (or it should change color)
 - ellipses have gaps, especially when they're too narrow
+	- filled ellipses are screwed because of those gaps
 - cannot draw at coords 0,0 with zoom 8 (1px cells)
-- why do I keep losing ~10 fps in 1px cells, seemingly randomly (when most cells are dead?!), or after clearing the grid while paused, or when mouse is over the UI? Stopping/randomizing and pressing play seems to bring fps back up, at least for a little bit.
+- why do I keep losing \~10 fps in 1px cells, seemingly randomly (when most cells are dead?!), or after clearing the grid while paused, or when mouse is over the UI? Stopping/randomizing and pressing play seems to bring fps back up, at least for a little bit.
 
 
 ## Considering:
