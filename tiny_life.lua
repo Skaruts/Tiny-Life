@@ -20,6 +20,14 @@
 	local assert,tonum,tostr,type,setmt,getmt,pairs,ipairs=assert,tonumber,tostring,type,setmetatable,getmetatable,pairs,ipairs
 	local gsub,fmt,rep=string.gsub,string.format,string.rep
 
+	local keys={
+		PGUP=54,PGDN=55,SPACE=48,ENTER=50,BSLASH=41,GRAVE=44,TAB=49,
+		A=1,B=2,C=3,D=4,E=5,F=6,G=7,H=8,I=9,J=10,K=11,L=12,M=13,N=14,O=15,P=16,
+		Q=17,R=18,S=19,T=20,U=21,V=22,W=23,X=24,Y=25,Z=26,
+		N0=27,N1=28,N2=29,N3=30,N4=31,N5=32,N6=33,N7=34,N8=35,N9=36,
+		CTRL=63,SHFT=64,ALT=65,
+	}
+
 	local function clamp(v,lo,hi)return max(lo,min(hi,v))end
 	local function wrap(v,lo,hi)return v>hi and lo or v<lo and hi or v end
 	local function round(a)local floored=floor(a)return a-floored>=0.5 and floored+1or floored end
@@ -40,6 +48,7 @@
 	--[[ Trace formatted                (0.01) ]] local function tracef(...)trace(fmt(...))end
 	--[[ Trace csv arguments            (0.01) ]] local function tracec(...)trace(t_conct({...},",").."\n")end
 	--[[ Debugging utility              (0.08) ]]
+		local DBG_KEY = keys.BSLASH
 		local dbg={
 			active=false,
 			crammed=false,
@@ -154,6 +163,7 @@
 				if _RECNI[k]then return _RECNI[k](t,v)end
 				error(fmt(bi_err,tostr(k)))
 			end,
+			__tostring=function(t) return fmt("(%d,%d,%d,%d)", t.x, t.y, t.w, t.h) end,
 			__eq=function(t,o)return t.x==o.x and t.y==o.y and t.w==o.w and t.h==o.h end,
 			sq=function(t)
 				return _rect(
@@ -262,14 +272,19 @@
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
-	-- in-game options/load values or defaults
-	local draw_d_cells, wrap_around, use_padding, rand_start, rand_reset =1,2,3,4,5
-	local opts={false, true, true, true, false}
+	-- in-game persistent options / load values or defaults
+	local draw_d_cells, wrap_around, use_padding, rand_start, rand_reset, zoom_lvl =1,2,3,4,5,6
+	local opts={false, true, true, true, false, 4}
 	if pmem(draw_d_cells) ~= 0 then opts[draw_d_cells] = true end
-	if pmem(wrap_around) ~= 1 then opts[wrap_around] = false end
-	if pmem(use_padding) ~= 1 then opts[use_padding] = false end
-	if pmem(rand_start) ~= 1 then opts[rand_start] = false end
-	if pmem(rand_reset) ~= 0 then opts[rand_reset] = true end
+	if pmem(wrap_around)  ~= 1 then opts[wrap_around]  = false end
+	if pmem(use_padding)  ~= 1 then opts[use_padding]  = false end
+	if pmem(rand_start)   ~= 1 then opts[rand_start]   = false end
+	if pmem(rand_reset)   ~= 0 then opts[rand_reset]   = true end
+
+	local mem_zoom = pmem(zoom_lvl)
+	if mem_zoom == 0 then pmem(zoom_lvl, 4)
+	elseif mem_zoom ~= 4 then opts[zoom_lvl] = mem_zoom
+	end
 
 	function toggle_opt(i) -- toggle value of an option and save it
 		local b=not opts[i]
@@ -286,18 +301,7 @@
 		ui_render="0ms",
 		render_dbg="0ms",
 	}
-	local keys={
-		PGUP=54,PGDN=55,SPACE=48,ENTER=50,BSLASH=41,GRAVE=44,TAB=49,
-		A=1,B=2,C=3,D=4,E=5,F=6,G=7,H=8,I=9,J=10,K=11,L=12,M=13,N=14,O=15,P=16,
-		Q=17,R=18,S=19,T=20,U=21,V=22,W=23,X=24,Y=25,Z=26,
-		N0=27,N1=28,N2=29,N3=30,N4=31,N5=32,N6=33,N7=34,N8=35,N9=36,
-		CTRL=63,SHFT=64,ALT=65,
-	}
-	-- zoom scalar (higher = smaller cells, less performance)
-	-- use 1, 2, 4 or 8
-	-- (NOTE: drawing tools get a bit buggy with
-	-- low fps unless you pause before drawing)
-	local zoom_lvl=8
+
 	local g_mx,g_my=0,0 -- grid mouse pos
 	local ct_mod,sh_mod,al_mod,mouse_on_ui=false,false,false,false
 	local cols={
@@ -315,11 +319,11 @@
 	local pre,cur,sel=1,2,3 -- prev/curr/ghost buffer indices
 	local cells={} -- cell buffers
 	local SS,NSW,NSH=8,30,17 -- sprite size, num sprites wide / high
-	local CS,GW,GH=SS//zoom_lvl,NSW*zoom_lvl,NSH*zoom_lvl -- cell size, grid width/height
-	local pad=0 -- padding for cell rects (always 0 if 'zoom_lvl < 8' -- see 'set_padding()')
+	local CS,GW,GH=SS//opts[zoom_lvl],NSW*opts[zoom_lvl],NSH*opts[zoom_lvl] -- cell size, grid width/height
+	local pad=0 -- padding for cell rects (always 0 if 'opts[zoom_lvl] < 8' -- see 'set_padding()')
 	local anim,ui_vis=nil,true
 	local paused,stopped,eraser,t_old=true,true,false,0
-	local bar_outline,bar_bg=132,255 -- tiles
+	local bar_outline,bar_bg=000,002 -- tiles
 	local use_topbar,use_ibar=false,false -- starting state is inverted for these
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
 	local GAME_SCR,HELP_SCR1,HELP_SCR2,HELP_SCR3,HELP_SCR4,OPTS_SCR=1,2,3,4,5,10 -- game screens
@@ -613,7 +617,7 @@ local tl,ui,rand_cells
 	end
 
 
-	local cb_i = 232
+	local cb_i = 208
 	function CheckBox(x,y,tx,is_on,fn,args)
 		Label(x+SS*2,y+1,tx,cols.text)
 
@@ -691,7 +695,7 @@ local tl,ui,rand_cells
 			ui.grp_tlbar=UIGroup()
 
 		group(ui.grp_tlbar)
-			ui.tlbar_handle=TlBarHandle(128,0,0,"Drag me! (U/2xM1 to reset)")
+			ui.tlbar_handle=TlBarHandle(006,0,0,"Drag me! (U/2xM1 to reset)")
 
 			ui.grp_play_btn=UIGroup()
 			ui.grp_pause_btn=UIGroup()
@@ -699,21 +703,22 @@ local tl,ui,rand_cells
 			anchor(ui.tlbar_handle)
 				ui.tlbar=Toolbar(bar_outline,0,0,SS*2,SS*11)
 
-				ui.btn_rand=Btn(0,SS*1,136,"Randomize cells",rand_cells)
-				ui.btn_decel=Btn(0,SS*2,200,"Speed -- (N/A yet)",set_speed(-1))
-				ui.btn_accel=Btn(SS*1,SS*2,216,"Speed ++ (N/A yet)",set_speed(1))
-				ui.btn_stop=ToggleBtn(0,SS*3,152,"Stop/clear",nil,"sticky",pause, {true})
-				ui.btn_play=ToggleBtn(SS*1,SS*3,168,"Play/Pause/Unpause",nil,"toggle",unpause)
-				ui.btn_pause=ToggleBtn(SS*1,SS*3,184,"Play/Pause/Unpause",nil,"toggle",pause)
+				ui.btn_rand=Btn(0,SS,016,"Randomize cells",rand_cells)
+				ui.btn_zoom=Btn(SS,SS,019,"Cycle zoom levels",function()set_zoom(1, true)end)
+				ui.btn_decel=Btn(0,SS*2,032,"Speed -- (N/A yet)",set_speed(-1))
+				ui.btn_accel=Btn(SS,SS*2,048,"Speed ++ (N/A yet)",set_speed(1))
+				ui.btn_stop=ToggleBtn(0,SS*3,064,"Stop/clear",nil,"sticky",pause, {true})
+				ui.btn_play=ToggleBtn(SS,SS*3,080,"Play/Pause/Unpause",nil,"toggle",unpause)
+				ui.btn_pause=ToggleBtn(SS,SS*3,096,"Play/Pause/Unpause",nil,"toggle",pause)
 
-				ui.tlbar.tls["brush"]=ToolBtn(0,5,160,"Brush","(V/1)",ui.tlbar,tl.switch,{"brush"})
-				ui.tlbar.tls["line"]=ToolBtn(1,5,208,"Line","(L)",ui.tlbar,tl.switch,{"line"})
-				ui.tlbar.tls["rect"]=ToolBtn(0,6,176,"Rectangle","(R)",ui.tlbar,tl.switch,{"rect"})
-				ui.tlbar.tls["circle"]=ToolBtn(1,6,192,"Circle","(C)",ui.tlbar,tl.switch,{"circle"})
-				ui.tlbar.tls["fill"]=ToolBtn(0,7,224,"Fill","(F)",ui.tlbar,tl.switch,{"fill"})
-				ui.tlbar.tls["pattern"]=ToolBtn(1,7,240,"Pattern","(2-6)",ui.tlbar,tl.switch,{"pattern"})
-				Sep(130,0,SS*4,2,1)
-				Sep(130,0,SS*8,2,1)
+				ui.tlbar.tls["brush"]=ToolBtn(0,5,112,"Brush","(V/1)",ui.tlbar,tl.switch,{"brush"})
+				ui.tlbar.tls["line"]=ToolBtn(1,5,160,"Line","(L)",ui.tlbar,tl.switch,{"line"})
+				ui.tlbar.tls["rect"]=ToolBtn(0,6,128,"Rectangle","(R)",ui.tlbar,tl.switch,{"rect"})
+				ui.tlbar.tls["circle"]=ToolBtn(1,6,144,"Circle","(C)",ui.tlbar,tl.switch,{"circle"})
+				ui.tlbar.tls["fill"]=ToolBtn(0,7,176,"Fill","(F)",ui.tlbar,tl.switch,{"fill"})
+				ui.tlbar.tls["pattern"]=ToolBtn(1,7,192,"Pattern","(2-6)",ui.tlbar,tl.switch,{"pattern"})
+				Sep(022,0,SS*4,2,1)
+				Sep(022,0,SS*8,2,1)
 			anchor()
 			ui.grp_rect=UIGroup()
 			ui.grp_circ=UIGroup()
@@ -721,14 +726,14 @@ local tl,ui,rand_cells
 
 		anchor(ui.tlbar_handle)
 			group(ui.grp_rect)
-				ui.icn_r_sqr=TLModeIcon(0,9,150,"Proportional (shift)")
-				ui.icn_r_fill=TLModeIcon(1,9,166,"Filled (ctrl)" )
-				ui.icn_r_cntr=TLModeIcon(0,10,182,"Centered (alt)")
+				ui.icn_r_sqr=TLModeIcon(0,9,070,"Proportional (shift)")
+				ui.icn_r_fill=TLModeIcon(1,9,086,"Filled (ctrl)" )
+				ui.icn_r_cntr=TLModeIcon(0,10,102,"Centered (alt)")
 
 			group(ui.grp_circ)
-				ui.icn_c_sqr=TLModeIcon(0,9,198,"Proportional (shift)")
-				ui.icn_c_fill=TLModeIcon(1,9,214,"Filled (ctrl)" )
-				ui.icn_c_cntr=TLModeIcon(0,10,230,"Centered (alt)")
+				ui.icn_c_sqr=TLModeIcon(0,9,118,"Proportional (shift)")
+				ui.icn_c_fill=TLModeIcon(1,9,134,"Filled (ctrl)" )
+				ui.icn_c_cntr=TLModeIcon(0,10,150,"Centered (alt)")
 			group()
 		anchor()
 
@@ -747,7 +752,7 @@ local tl,ui,rand_cells
 			ui.grp_ibar = UIGroup()
 
 		group(ui.grp_ibar)
-			ui.ibar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS*1+2)
+			ui.ibar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS+2)
 			anchor(ui.ibar)
 				ui.lbl_nfo=Label(SS*8,2,"",cols.text)
 				ui.lbl_mouse=Label(2,2,"",cols.dim_text)
@@ -768,7 +773,7 @@ local tl,ui,rand_cells
 		group(ui.grp_ui)
 			ui.grp_tbar = UIGroup()
 		group(ui.grp_tbar)
-			ui.tbar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS*1+2)
+			ui.tbar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS+2)
 
 			anchor(ui.tbar)
 				Label(SS*15-1, 2, "C:         |         /", cols.text)
@@ -1309,23 +1314,25 @@ local tl,ui,rand_cells
 		l_cells=(fill and GW*GH or 0)
 	end
 
-	function set_zoom(dir)
-		local z = zoom_lvl
-		if dir == 1 then 	z = clamp(z * 2,  1, 8)
-		else				z = clamp(z // 2, 1, 8)
+	function set_zoom(dir, wrp)
+		local z,limit = opts[zoom_lvl],wrp and wrap or clamp
+
+		if dir == 1 then 	z = limit(z * 2,  1, 8)
+		else				z = limit(z // 2, 1, 8)
 		end
 
-		if z ~= zoom_lvl then
+		if z ~= opts[zoom_lvl] then
 			CS = SS//z
 			GW = 30*z
 			GH = 17*z
-			zoom_lvl = z
+			opts[zoom_lvl] = z
 			set_padding(opts[use_padding])
 			gens = 0
 			l_cells = 0
 			create_cells()
 			TOT_CELLS = GW*GH
 			if not paused then pause() end
+			pmem(zoom_lvl, z)
 		end
 	end
 
@@ -1438,13 +1445,14 @@ local tl,ui,rand_cells
 	bma("update",function()--@bm
 		if cur_scr == GAME_SCR then
 			update_tools()
+			-- if tl.is_drawing then monitor("bb  ", tl.bbox) end
 			if use_ibar then ui.lbl_nfo:set_text("") end
 
 			if not mouse_on_ui then
 				tl.clear()
 				tl.draw_points(g_mx, g_my)
-				ui.lbl_mouse:set_text(zoom_lvl.." | "..g_mx..", "..g_my)
 			end
+			ui.lbl_mouse:set_text(opts[zoom_lvl].." | "..g_mx..", "..g_my)
 
 			if not paused then
 			bma("compute gen",function()--@bm
@@ -1571,7 +1579,7 @@ local tl,ui,rand_cells
 -- input
 	local function handle_keys()
 		local k = keys
-		if keyp(k.D) then dbg:toggle()
+		if keyp(DBG_KEY) then dbg:toggle()
 		else
 			if     cur_scr >= OPTS_SCR then
 				if keyp(k.O) then toggle_options() end
