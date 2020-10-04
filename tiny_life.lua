@@ -680,7 +680,7 @@ local tl,ui,rand_cells
 	ui={
 		grp_ui,grp_tlbar,grp_ibar,grp_tbar,grp_rect,grp_circ,grp_play_btn,grp_pause_btn,grp_opts,
 		ui_bg,tlbar,ibar,tbar,tlbar_handle,
-		lbl_gens,lbl_cells1,lbl_cells2,lbl_cells3,lbl_cells4,lbl_nfo,lbl_help,lbl_mouse,
+		lbl_spd,lbl_gens,lbl_cells1,lbl_cells2,lbl_cells3,lbl_cells4,lbl_nfo,lbl_help,lbl_mouse,
 		btn_rand,btn_decel,btn_accel,btn_stop,btn_play,btn_pause,btn_help,btn_opts,btn_opts_out,
 		icn_r_sqr,icn_r_fill,icn_r_cntr,icn_c_sqr,icn_c_fill,icn_c_cntr,
 		cbx_pad,
@@ -772,7 +772,7 @@ local tl,ui,rand_cells
 
 			anchor(ui.tbar)
 				Label(SS*15-1, 2, "C:         |         /", cols.text)
-				ui.lbl_gens   = Label(2,  2, "Sp: 1", cols.text)
+				ui.lbl_spd    = Label(2,  2, "Sp: 1", cols.text)
 				ui.lbl_gens   = Label(SS*6,  2, "G: ", cols.text)
 				ui.lbl_cells2 = Label(SS*20, 2, "",    cols.text, 2)
 				ui.lbl_cells3 = Label(SS*25, 2, "",    cols.text, 2)
@@ -795,7 +795,6 @@ local tl,ui,rand_cells
 			ui.grp_opts = UIGroup()
 
 		group(ui.grp_opts)
-			-- toggle_options
 			ui.cbx_deadc = CheckBox(SS*2, SS*4,  "draw dead cells",      opts[draw_d_cells], toggle_opt, {draw_d_cells})
 			ui.cbx_pad   = CheckBox(SS*2, SS*5,  "use cell padding",     opts[use_padding],  function()toggle_padding()end)
 			ui.rand_cb   = CheckBox(SS*2, SS*6, "reset on randomize",   opts[rand_reset],   toggle_opt, {rand_reset})
@@ -836,8 +835,8 @@ local tl,ui,rand_cells
 		ui.grp_ui=UIGroup()
 		ui.ui_bg=tc.element({
 			x=0,y=0,w=240,h=136,
-			onStartHover=function(t)mouse_on_ui=false end,
-			onEndHover=function(t)mouse_on_ui=true end
+			onStartHover=function()mouse_on_ui=false end,
+			onEndHover=function()mouse_on_ui=true end
 		})
 
 		init_tlbar()
@@ -1682,6 +1681,7 @@ local tl,ui,rand_cells
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Unsorted stuff
 	function toggle_ui()
@@ -1795,6 +1795,7 @@ local tl,ui,rand_cells
 
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
+
 
 function TIC()
 	local t_new = time()/1000
