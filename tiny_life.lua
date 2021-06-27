@@ -5,17 +5,17 @@
 -- script: lua
 -- input: mouse, keyboard
 -- saveid: TinyLife
--- version 1.2
+-- version 1.3
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- MIT License (c) 2019 Skaruts (MetalDudeBro)
 --=--=--=--=--=--=--=--=--=--=--=--=--
-
+-- 62452
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- utils & shortenings
 	local poke4,print,pix,spr,clip,rect,rectb=poke4,print,pix,spr,clip,rect,rectb
 
-	local t_ins,t_sort,t_rem,t_conct,t_unpk=table.insert,table.sort,table.remove,table.concat,table.unpack
+	local ins,sort,rem,conc,unpk=table.insert,table.sort,table.remove,table.concat,table.unpack
 	local floor,ceil,max,min,abs,rand=math.floor,math.ceil,math.max,math.min,math.abs,math.random
 	local assert,tonum,tostr,type,setmt,getmt,pairs,ipairs=assert,tonumber,tostring,type,setmetatable,getmetatable,pairs,ipairs
 	local gsub,fmt,rep=string.gsub,string.format,string.rep
@@ -28,15 +28,15 @@
 		CTRL=63,SHFT=64,ALT=65,
 	}
 
-	local function clamp(v,lo,hi)return max(lo,min(hi,v))end
-	local function wrap(v,lo,hi)return v>hi and lo or v<lo and hi or v end
-	local function round(a)local floored=floor(a)return a-floored>=0.5 and floored+1or floored end
-	local function lerp(a,b,t)return a*(1-t)+b*t end
-	local function stonum(v,base)return tonum(v,base)end
-	local function btonum(b)return b and 1 or 0 end
 
+	--[[ clamp - keep v between l and h        002 ]] local function clamp(v,l,h)return max(l,min(v,h))end
+	--[[ wrap - wrap v around l and h          003 ]] local function wrap(v,l,h) return v > h and l or v<l and h or v end
+	--[[ round - round v to nearest int        003 ]] local function round(v)return floor(v+0.5)end
+	--[[ lerp - linear interpolate             002 ]] local function lerp(a,b,t)return a*(1-t)+b*t end
+	--[[ printgs - print on grid with shadow   009 ]] local function printgs(t,x,y,c,sc,fw,s,ox,oy) fw,s,sc=fw or false,s or 1,sc or 1 x,y=x*8+1+(ox or 0),y*8+1+(oy or 0) print(t,x+1,y+1,sc,fw,s) print(t,x,y,c,fw,s) end
+	--[[ printgsc - print grid/shadow/centered 010 ]] local function printgsc(tx,x,y,c,sc,fw,s) fw,s,sc=fw or false,s or 1,sc or 1 if not x then x=(240//8)//2-(txtw(tx)//8)//2 end if not y then y=(136//8)//2 end print(tx,x*8+1,y*8+1,sc,fw,s) print(tx,x*8,y*8,c,fw,s) end
 
-	--[[ Print w/ drop shadow           (0.06) ]]
+	--[[ Print grid w/ drop shadow           (0.06) ]]
 		local shad_c=3 -- shadow_color
 		local function prints(t,x,y,c,fix_w,ofx,ofy)
 			if not y then return print(t,-999,-999, 0, x) end
@@ -44,69 +44,12 @@
 			print(t,x*8+xc+ofx+1,y*8+yc+ofy+1,shad_c,fix_w,1)
 			print(t,x*8+xc+ofx,y*8+yc+ofy,c,fix_w,1)
 		end
-	--[[ Print w/ drop shadow centered  (0.07) ]] local function printc(t,x,y,c,fix_w)local xc,yc,c,len=1,1,c or 15,print(t,-999,-999)x=x==nil and(240-len)//2or x*8 y=y==nil and 136//2-8//2or y*8 print(t,x+xc+1,y+yc+1,shad_c,fix_w)print(t,x+xc,y+yc,c,fix_w)end
-	--[[ Trace formatted                (0.01) ]] local function tracef(...)trace(fmt(...))end
-	--[[ Trace csv arguments            (0.01) ]] local function tracec(...)trace(t_conct({...},",").."\n")end
-	--[[ Debugging utility              (0.08) ]]
-		local DBG_KEY = keys.BSLASH
-		local dbg={
-			active=false,
-			crammed=false,
-			col=6,
-			fix_w=true,
-			h=0,w=0,vals=nil,
-			toggle=function(t)t.active=not t.active end,
-			cram_text=function(t,enbl)t.crammed=enbl end,
-			draw=function(t)
-				if t.active then
-					if t.crammed then
-						local w=prints(t.vals,t.fix_w)
-						rect(0,0,w+8,t.h*8,1)
-						prints(t.vals,0,0,t.col,t.fix_w)
-						t.vals=""
-					else
-						local w=t.w*8-t.w*2
-						rect(0,0,w+8,t.h*8+8,1)
-						for i=1,#t.vals do
-							prints(t.vals[i],0,i-1,t.col,t.fix_w)
-						end
-						t.vals,t.w={},0
-					end
-					t.h=0
-				end
-			end,
-		}
-		dbg.vals=dbg.crammed and""or{}
-		local function monitor(k,v)
-			local t=dbg
-			if t.active then
-				if t.crammed then
-					if v==nil then t.vals=t_conct({t.vals,k,'\n'})
-					elseif k~=""then t.vals=t_conct({t.vals,k,tostr(v),'\n'})
-					else t.vals=t_conct({t.vals,tostr(v),'\n'})
-					end
-				else
-					local s
-					if v==nil then s=k
-					elseif k~=""then s=t_conct({k,tostr(v)})
-					else s=tostr(v)
-					end
-					t.vals[#t.vals+1]=s
-					if #s>t.w then t.w=#s end
-				end
-				t.h=t.h+1
-			end
-		end
-		local function bm(name,f)  -- benchmark
-			local t1=time()
-			f()
-			monitor(name,fmt("%.2f",time()-t1).."ms")
-		end
-		local function bma(name,f) -- benchmark aligned
-			local t1=time()
-			f()
-			monitor(name..rep(' ',14-#name),fmt("%.2f",time()-t1).."ms")
-		end
+	--[[ Print grid w/ drop shadow centered  (0.07) ]] local function printc(t,x,y,c,fix_w)local xc,yc,c,len=1,1,c or 15,print(t,-999,-999)x=x==nil and(240-len)//2or x*8 y=y==nil and 136//2-8//2or y*8 print(t,x+xc+1,y+yc+1,shad_c,fix_w)print(t,x+xc,y+yc,c,fix_w)end
+
+	--[[ txtw - get text width                 002 ]] local function txtw(tx,fw,s,sf) return print(tx,0,-99,-1,fw or false,s or 1,sf or false) end
+	--[[ tracef - trace formatted              001 ]] local function tracef(...) trace(fmt(...)) end
+	--[[ tracec - trace csv arguments          003 ]] local function tracec(...) local t={} for i=1,select("#",...)do t[i]=tostr(select(i,...)) end trace(conc(t,",")) end
+	--[[ Debug/benchmark utilities             018 ]] local _f,monitor,bm,bma=1 local dbg={key=41, fg=6, bg=2, active=false, use_padding=true, fixw=true, h=0,w=0,vals=nil,reg={}, toggle=function(t)t.active=not t.active end, spaced=function(t,b)t.use_padding=b end, draw=function(t) _f=_f+1 if _f>500 then _f=1 for k,_ in pairs(t.reg)do t.reg[k]=0 end end if not t.active then return end if t.use_padding then local w=t.w*8-t.w*2 rect(0,0,w+8,t.h*8+8,t.bg) for i=1,#t.vals do print(t.vals[i],2,(i-1)*8+2,t.fg,t.fixw) end t.vals,t.w={},0 else local w=txtw(t.vals,t.fixw) rect(0,0,w+8,(t.h+1)*6,t.bg) print(t.vals,2,2,t.fg,t.fixw) t.vals=""end t.h=0 end, } dbg.vals=dbg.use_padding and{}or""function monitor(k,v,n) local t=dbg if not t.active then return end if t.use_padding then local s if v==nil then s=k elseif k~=""then if n then k=k..rep(' ',n-#k) end s=conc({k,tostr(v)}) else s=tostr(v) end t.vals[#t.vals+1]=s if #s>t.w then t.w=#s end else if v==nil then t.vals=conc({t.vals,k,'\n'}) elseif k~=""then if n then k=k..rep(' ',n-#k) end t.vals=conc({t.vals,k,tostr(v),'\n'}) else t.vals=conc({t.vals,tostr(v),'\n'}) end end t.h=t.h+1 end function bm(id,f) local tm=time() f() monitor(id, fmt("%.2fms",time()-tm)) end function bma(id,f) local rg,t1,t2,s=dbg.reg if not rg[id]then rg[id]=0 end t1=time() f() t2=time()-t1 s=fmt("%.2fms",t2) rg[id]=rg[id]+t2 s=s..rep(' ',9-#s)..fmt("%.2fms",rg[id]/_f) monitor(id..rep(' ',11-#id),s) end
 	--[[ Vector2 (stripped)             (0.02) ]]
 		local _VECMT={}
 		local function _vec_xy(x,y)return setmt({x=x,y=y},_VECMT)end
@@ -202,34 +145,45 @@
 				return pts
 			end,
 		}
-	--[[ mouse states                   (0.03) ]]
-		--TODO: could I use binary for the button states
-		local
-		mx,my,lmb,mmb,rmb,mwx,mwy,
-		M1,M2,M3,LMB,RMB,MMB,m_stt,
-		mbtn,mbtnp,mbtnr,mbtnt,update_mouse=
-		0,0,false,false,false,0,0,
-		1,2,3,1,2,3,{
-			prev={0,0,0}, -- left, right, middle
-			curr={0,0,0}  -- left, right, middle
-		}
-		mbtn=function(b)
+	--[[ Mouse States                          006 ]]
+		local mx,my,mwx,mwy,lmx,lmy,rmx,rmy=0,0,0,0,0,0,0,0
+		local M1,M2,M3,m1,m2,m3=1,2,3,false,false,false
+		local m_stt={prev={0,0,0},curr={0,0,0}}
+		local mbtn,mbtnp,mbtnr,mbtnt,update_mst
+		function mbtn(b)
 			if b then return m_stt.curr[b]>0 end
-			return m_stt.curr[1]>0 or m_stt.curr[2]>0 or m_stt.curr[3]>0
+			return m_stt.curr[1]>0
+			    or m_stt.curr[2]>0
+			    or m_stt.curr[3]>0
 		end
-		mbtnp=function(b)
+		function mbtnp(b)
 			if b then return m_stt.curr[b]==1 end
-			return m_stt.curr[1]==1 or m_stt.curr[2]==1 or m_stt.curr[3]==1
+			return m_stt.curr[1]==1
+			    or m_stt.curr[2]==1
+			    or m_stt.curr[3]==1
 		end
-		mbtnr=function(b)return m_stt.prev[b]>0 and m_stt.curr[b]==0 end
-		mbtnt=function(b)return m_stt.curr[b]end
-		update_mouse=function()
-			mx,my,lmb,mmb,rmb,mwx,mwy=mouse()
+		function mbtnr(b)
+			if b then return m_stt.prev[b]>0 and m_stt.curr[b]==0 end
+			return m_stt.prev[1]>0 and m_stt.curr[1]==0
+			    or m_stt.prev[2]>0 and m_stt.curr[2]==0
+			    or m_stt.prev[3]>0 and m_stt.curr[3]==0
+		end
+		function mbtnt(b)
+			if b then return m_stt.curr[b] end
+			return m_stt.curr[1],m_stt.curr[2],m_stt.curr[3]
+		end
+		function update_mst()
+			lmx,lmy=mx,my
+			mx,my,m1,m3,m2,mwx,mwy=mouse()
+			rmx,rmy=mx-lmx,my-lmy
 			m_stt.prev={m_stt.curr[1],m_stt.curr[2],m_stt.curr[3]}
 			m_stt.curr={0,0,0}
-			if lmb then m_stt.curr[1]=m_stt.prev[1]+1 end
-			if rmb then m_stt.curr[2]=m_stt.prev[2]+1 end
-			if mmb then m_stt.curr[3]=m_stt.prev[3]+1 end
+			if m1 then m_stt.curr[1]=m_stt.prev[1]+1 end
+			if m2 then m_stt.curr[2]=m_stt.prev[2]+1 end
+			if m3 then m_stt.curr[3]=m_stt.prev[3]+1 end
+		end
+		function mmoved()
+			return mx~=lmx or my~=lmy
 		end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -243,16 +197,16 @@
 	-- The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 	-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	tc={name="tc",elements={},z=1,hz=nil}tc.__index=tc tc.me={nothing=0,click=1,noclick=2,none=3}local e={__index=tc}local function u(r,e,n,t,o,i)return r>n and r<n+o and e>t and e<t+i end local function R(e,o,t)for n,r in pairs(o)do if type(r)=="table"then if type(e[n]or false)=="table"then R(e[n]or{},o[n]or{},t)else if not e[n]or t then e[n]=r end end else if not e[n]or t then e[n]=r end end end return e end local function i(e,n)if(e==nil and	n==nil)then for e=0,15 do poke4(16368*2+e,e)end else poke4(16368*2+e,n)end end function tc.lerp(e,n,t)if e==n then return e else if abs(e-n)<.005 then return n else return e*(1-t)+n*t end end end local function F(o)local t={}local function r(e)if type(e)~="table"then return e elseif t[e]then return t[e]end local n={}t[e]=n for t,e in pairs(e)do n[r(t)]=r(e)end return setmt(n,getmt(e))end return r(o)end local function f(o,r,t,n,e)if o then return t elseif r then return n else return e end end function tc.print(t,i,a,o,n,e)n=n or false e=e or 1 local d,r=gsub(t,"\n","")local w,h if o then w,h=print(t,i,a,o,n,e),(6+r)*e*(r+1)end return w,h end function tc.font(c,s,f,r,e,a,n,o,t)e=e or-1 a=a or 8 n=n or 8 o=o or false t=t or 1 local
-	d,l=gsub(c,"\n","")if type(e)=="table"and type(e[1])=="table"then for t,n in ipairs(e[1])do if type(r)=="table"then i(n,r[t])else i(n,r)end end e=e[2]end local d if r then d=font(c,s,f,e,a,n,o,t)end i()return d,(n+l)*t*(1+l)end function tc.element(t,n)if not n then n=t t="element"end local e=n setmt(e,tc)e.hover,e.click=false,false e.activity=n.activity or true e.drag=n.drag or{activity=false}e.align=n.align or{x=0,y=0}e.visibility=n.visibility or true if e.content then if not e.content.scroll then e.content.scroll={x=0,y=0}end e.content.w,e.content.h=e.content.w or e.w,e.content.h or e.h end e.type,e.z=t,tc.z tc.z=tc.z+1 tc.hz=tc.z t_ins(tc.elements,e)return e end function tc.Element(e)return tc.element("element",e)end function tc.Style(e)return e end function tc.Group()local e={type="group",elements={}}setmt(e,tc)return e end function tc:updateSelf(e)if e.mouse_x and e.mouse_y and e.event then mouse_x=e.mouse_x mouse_y=e.mouse_y mouse_press=e.press mouse_event=e.event local a,d,n,t,r,e,e local e,i,o=tc.me,self.x-(self.align.x==1 and self.w*.5 or(self.align.x==2 and self.w or 0)),self.y-(self.align.y==1 and self.h*.5-1 or(self.align.y==2
+	d,l=gsub(c,"\n","")if type(e)=="table"and type(e[1])=="table"then for t,n in ipairs(e[1])do if type(r)=="table"then i(n,r[t])else i(n,r)end end e=e[2]end local d if r then d=font(c,s,f,e,a,n,o,t)end i()return d,(n+l)*t*(1+l)end function tc.element(t,n)if not n then n=t t="element"end local e=n setmt(e,tc)e.hover,e.click=false,false e.activity=n.activity or true e.drag=n.drag or{activity=false}e.align=n.align or{x=0,y=0}e.visibility=n.visibility or true if e.content then if not e.content.scroll then e.content.scroll={x=0,y=0}end e.content.w,e.content.h=e.content.w or e.w,e.content.h or e.h end e.type,e.z=t,tc.z tc.z=tc.z+1 tc.hz=tc.z ins(tc.elements,e)return e end function tc.Element(e)return tc.element("element",e)end function tc.Style(e)return e end function tc.Group()local e={type="group",elements={}}setmt(e,tc)return e end function tc:updateSelf(e)if e.mouse_x and e.mouse_y and e.event then mouse_x=e.mouse_x mouse_y=e.mouse_y mouse_press=e.press mouse_event=e.event local a,d,n,t,r,e,e local e,i,o=tc.me,self.x-(self.align.x==1 and self.w*.5 or(self.align.x==2 and self.w or 0)),self.y-(self.align.y==1 and self.h*.5-1 or(self.align.y==2
 	and self.h-1 or 0))a=mouse_event~=e.none and mouse_press or false d=u(mouse_x,mouse_y,i,o,self.w,self.h)n=mouse_event~=e.none and d or false t,r=self.hover,self.hold self.hover=n or(self.drag.active and tc.draging_obj and tc.draging_obj.obj==self)self.hold=((mouse_event==e.click and n)and true)or(a and self.hold)or((n and mouse_event~=e.noclick and self.hold))if mouse_event==e.click and n and self.onClick then self.onClick(self)elseif(mouse_event==e.noclick and n and r)and self.onCleanRelease then self.onCleanRelease(self)elseif((mouse_event==e.noclick and n and r)or(self.hold and	not n))and self.onRelease then self.onRelease(self)elseif self.hold and self.onPress then self.onPress(self)elseif not t and self.hover and	self.onStartHover then self.onStartHover(self)elseif self.hover and self.onHover then self.onHover(self)elseif t and not self.hover and self.onEndHover then self.onEndHover(self)end if self.hold and(not n or self.drag.active)and not tc.draging_obj then self.hold=self.drag.active	tc.draging_obj={obj=self,d={x=i-mouse_x,y=o-mouse_y}}elseif not self.hold and n and(tc.draging_obj and tc.draging_obj.obj==self)then self.hold=true
 	tc.draging_obj=nil end if tc.draging_obj and tc.draging_obj.obj==self and self.drag.active then self.x=(not self.drag.fixed or not self.drag.fixed.x)and mouse_x+tc.draging_obj.d.x or self.x self.y=(not self.drag.fixed or not self.drag.fixed.y)and mouse_y+tc.draging_obj.d.y or self.y local e=self.drag.bounds if e then if e.x then self.x=(e.x[1]and self.x<e.x[1])and e.x[1]or self.x self.x=(e.x[2]and self.x>e.x[2])and e.x[2]or self.x end if e.y then self.y=(e.y[1]and self.y<e.y[1])and e.y[1]or self.y self.y=(e.y[2]and self.y>e.y[2])and e.y[2]or self.y end end if self.track then self:anchor(self.track.ref)end end return n elseif e.focused_element and e.event then local t,i,a,n,r,o=tc.me i=e.event~=t.none and e.press or false a=self==e.focused_element n=e.event~=t.none and a or false r,o=self.hover,self.hold self.hover=n self.hold=((e.event==t.click and n)and true)or(i and self.hold)or((n and e.event~=t.noclick and self.hold))if e.event==t.click and n and self.onClick then self.onClick(self)elseif(e.event==t.noclick and n and o)and self.onCleanRelease then self.onCleanRelease(self)elseif((e.event==t.noclick and n and o)or(self.hold and not n))and self.onRelease then
 	self.onRelease(self)elseif self.hold and self.onPress then self.onPress(self)elseif not r and self.hover and self.onStartHover then self.onStartHover(self)elseif self.hover and self.onHover then self.onHover(self)elseif r and not self.hover and self.onEndHover then self.onEndHover(self)end return n	else error("updateSelf error in arguments!")end end function tc:updateTrack()local n,e=self.drag.bounds,self.track if e then self.x,self.y=e.ref.x+e.d.x,e.ref.y+e.d.y if n and n.relative then if n.x then n.x[1]=e.ref.x+e.b.x[1]or nil n.x[2]=e.ref.x+e.b.x[2]or nil end if n.y then n.y[1]=e.ref.y+e.b.y[1]or nil n.y[2]=e.ref.y+e.b.y[2]or nil end end end end function tc:drawSelf()if self.visibility then local S,C,R,h,j,v,u,P,o,r,m,_,p,b,k,z,s,x,e,i,l,d,H,y,g local c,a,e,t,n,w=self.shadow,self.border,self.text,self.icon,self.tiled,self.colors o=self.x-(self.align.x==1 and self.w*.5-1 or(self.align.x==2 and self.w-1 or 0))r=self.y-(self.align.y==1 and self.h*.5-1 or(self.align.y==2 and self.h-1 or 0))if c and c.colors then c.offset=c.offset or{x=1,y=1}C=f(self.hold,self.hover,c.colors[3],c.colors[2],c.colors[1])if C then rect(o+c.offset.x,r+c.offset.y,self.w,self.h,C)end end if
 	w then S=f(self.hold,self.hover,w[3],w[2],w[1])if S then rect(o,r,self.w,self.h,S)end end i=a and(a.width)or 0 y=2*i if n then n.scale=n.scale or 1 n.key=n.key or-1 n.flip=n.flip or 0 n.rotate=n.rotate or 0 n.w=n.w or 1 n.h=n.h or 1 H=f(self.hold,self.hover,n.sprites[3],n.sprites[2],n.sprites[1])if H then clip(o+i,r+i,self.w-y,self.h-y)for e=0,self.w+(8*n.w)*n.scale,(8*n.w)*n.scale do for t=0,self.h+(8*n.h)*n.scale,(8*n.h)*n.scale do spr(H,o+e+i,r+t+i,n.key,n.scale,n.flip,n.rotate,n.w,n.h)end end clip()end end if self.content and self.drawContent then if self.content.wrap and clip then clip(o+i,r+i,self.w-y,self.h-y)end self:renderContent()if self.content.wrap and clip then clip()end end if a and a.colors then k=a.colors R=f(self.hold,self.hover,k[3],k[2],k[1])if R then for e=0,a.width-1 do rectb(o+e,r+e,self.w-2*e,self.h-2*e,R)end end end if a and a.sprites then l=a.key or-1 d=f(self.hold,self.hover,a.sprites[3],a.sprites[2],a.sprites[1])if d then clip(o+8,r,self.w-16+1,self.h)for e=8,self.w-9,8 do spr(d[2],o+e,r,l,1,0,0)spr(d[2],o+e,r+self.h-8,l,1,0,2)end clip()spr(d[1],o,r,l,1,0,0)spr(d[1],o+self.w-8,r,l,1,0,1)clip(o,r+8,self.w,self.h-16+1)for e=8,self.h-9,8 do spr(d[2],
 	o,r+e,l,1,0,3)spr(d[2],o+self.w-8,r+e,l,1,2,1)end clip()spr(d[1],o+self.w-8,r+self.h-8,l,1,0,2)spr(d[1],o,r+self.h-8,l,1,0,3)end end if t and t.sprites and#t.sprites>0 then P=((self.hold and t.sprites[3])and t.sprites[3])or((self.hover and t.sprites[2])and t.sprites[2])or t.sprites[1]z=t.offset or{x=0,y=0}t.align=t.align or{x=0,y=0}spr(P,(o+(t.align.x==1 and self.w*.5-((t.scale*8)/2)or(t.align.x==2 and self.w-(t.scale*8)or 0))+z.x),(r+(t.align.y==1 and self.h*.5-((t.scale*8)/2)or(t.align.y==2 and self.h-(t.scale*8)or 0))+z.y),t.key,t.scale,t.flip,t.rotate,t.w,t.h)end if e and e.print then u=e.colors or{15,15,15}u[1]=u[1]or 15 j=f(self.hold,self.hover,u[3],u[2],u[1])if e.shadow then v=e.shadow h=f(self.hold,self.hover,v.colors[3],v.colors[2],v.colors[1])x=v.offset or{x=1,y=1}end s=e.offset or{x=0,y=0}if e.font then e.space=e.space or{w=8,h=8}m,_=tc.font(e.print,0,200,-1,e.key,e.space.w,e.space.h,e.fixed,e.scale)else m,_=tc.print(e.print,0,200,-1,e.fixed,e.scale)end g=e.align or{x=0,y=0}p=(g.x==1 and o+((self.w*.5)-(m*.5))+s.x or(g.x==2 and o+((self.w)-(m))+s.x-i or o+s.x+i))b=(g.y==1 and r+((self.h*.5)-(_*.5))+s.y or(g.y==2 and r+((self.h)-(_))+s.y-i or r+
 	s.y+i))if e.font then if type(h)=="table"then tc.font(e.print,p+x.x,b+x.y,h,e.key,e.space.w,e.space.h,e.fixed,e.scale)end tc.font(e.print,p,b,j,e.key,e.space.w,e.space.h,e.fixed,e.scale)else if h then tc.print(e.print,p+x.x,b+x.y,h,e.fixed,e.scale)end tc.print(e.print,p,b,j,e.fixed,e.scale)end end end end function tc:renderContent()local i,o,n,t,r,e e=self.align i=self.x-(e.x==1 and self.w*.5 or(e.x==2 and self.w or 0))o=self.y-(e.y==1 and self.h*.5-1 or(e.y==2 and self.h-1 or 0))n=self.border and self.border.width or 1 t=i-(self.content.scroll.x or 0)*(self.content.w-self.w)+n r=o-(self.content.scroll.y or 0)*(self.content.h-self.h)+n self.drawContent(self,t,r)end function tc:Content(e)self.drawContent=e return self end function tc:scroll(e)if e~=nil then e.x=e.x or 0 e.y=e.y or 0 if self.content then e.x=(e.x<0 and 0)or(e.x>1 and 1)or e.x e.y=(e.y<0 and 0)or(e.y>1 and 1)or e.y self.content.scroll.x,self.content.scroll.y=e.x or self.content.scroll.x,e.y or self.content.scroll.y end return self else if self.content then return self.content.scroll end end end function tc.update(e,l,o)local t,r=tc.me,tc.elements local d,i,a,n=t.nothing,false,{},nil if type(e)=="table"
-	then o=l end if e then if tc.click and not o then tc.click=false d=t.noclick tc.draging_obj=nil elseif not tc.click and o then tc.click=true d=t.click tc.draging_obj=nil end for e=1,#r do t_ins(a,r[e])end t_sort(a,function(n,e)return n.z>e.z end)for r=1,#a do n=a[r]if n then if type(e)=="table"then if n:updateSelf{focused_element=e,press=o,event=(i or not n.activity)and t.none or d}then i=true end elseif e and l and type(e)~="table"then if n:updateSelf{mouse_x=e,mouse_y=l,press=o,event=((i or(tc.draging_obj and tc.draging_obj.obj~=n))or not n.activity)and t.none or d}then i=true end else error("Wrong arguments for update()")end end end for e=#r,1,-1 do if r[e]then r[e]:updateTrack()end end end end function tc.draw()local e={}for n=1,#tc.elements do if tc.elements[n].draw then t_ins(e,tc.elements[n])end end t_sort(e,function(n,e)return n.z<e.z end)for n=1,#e do e[n]:drawSelf()end end function tc:style(e)if self.type=="group"then for t,n in pairs(self.elements)do R(n,F(e),false)end else R(self,F(e),false)end return self end function tc:anchor(n)if self.type=="group"then for t,e in pairs(self.elements)do e:anchor(n)end else local e,t,r,o,i=self.drag.bounds,
-	nil,nil,nil,nil if e and e.x then t=e.x[1]-n.x r=e.x[2]-n.x elseif e and e.y then o=e.y[1]-n.y i=e.y[2]-n.y end self.track={ref=n,d={x=self.x-n.x,y=self.y-n.y},b={x={t,r},y={o,i}}}end return self end function tc:group(n,e)if e then n.elements[e]=self else t_ins(n.elements,self)end return self end function tc:active(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:active(e)end else self.activity=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:active()end return e else if self.activity~=nil then return self.activity end end end end function tc:visible(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:visible(e)end else self.visibility=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:visible()end return e else if self.activity~=nil then return self.visibility end end end end function tc:dragBounds(e)if e~=nil then self.drag.bounds=e else return self.drag.bounds end end function tc:horizontalRange(n)local e=self.drag.bounds if n~=nil then self.x=e.x[1]+(e.x[2]-e.x[1])*n else assert(e and e.x and#e.x==2,
-	"X bounds error!")return(self.x-e.x[1])/(e.x[2]-e.x[1])end end function tc:verticalRange(n)local e=self.drag.bounds if n~=nil then self.y=e.y[1]+(e.y[2]-e.y[1])*n else assert(e and e.y and#e.y==2,"Y bounds error!")return(self.y-e.y[1])/(e.y[2]-e.y[1])end end function tc:index(e)if e~=nil then if self.type=="group"then local n for t,e in pairs(self.elements)do if not n or e.z<n then n=e.z end end for r,t in pairs(self.elements)do local e=t.z-n+e t:index(e)end else self.z=e if e>tc.hz then tc.hz=e end end else return self.z end return end function tc:toFront()if self.z<tc.hz or self.type=="group"then return self:index(tc.hz+1)end end function tc:remove()for e=#tc.elements,1,-1 do if tc.elements[e]==self then t_rem(tc.elements,e)self=nil end end end function tc.empty()for e=1,#tc.elements do tc.elements[e]=nil end end
+	then o=l end if e then if tc.click and not o then tc.click=false d=t.noclick tc.draging_obj=nil elseif not tc.click and o then tc.click=true d=t.click tc.draging_obj=nil end for e=1,#r do ins(a,r[e])end sort(a,function(n,e)return n.z>e.z end)for r=1,#a do n=a[r]if n then if type(e)=="table"then if n:updateSelf{focused_element=e,press=o,event=(i or not n.activity)and t.none or d}then i=true end elseif e and l and type(e)~="table"then if n:updateSelf{mouse_x=e,mouse_y=l,press=o,event=((i or(tc.draging_obj and tc.draging_obj.obj~=n))or not n.activity)and t.none or d}then i=true end else error("Wrong arguments for update()")end end end for e=#r,1,-1 do if r[e]then r[e]:updateTrack()end end end end function tc.draw()local e={}for n=1,#tc.elements do if tc.elements[n].draw then ins(e,tc.elements[n])end end sort(e,function(n,e)return n.z<e.z end)for n=1,#e do e[n]:drawSelf()end end function tc:style(e)if self.type=="group"then for t,n in pairs(self.elements)do R(n,F(e),false)end else R(self,F(e),false)end return self end function tc:anchor(n)if self.type=="group"then for t,e in pairs(self.elements)do e:anchor(n)end else local e,t,r,o,i=self.drag.bounds,
+	nil,nil,nil,nil if e and e.x then t=e.x[1]-n.x r=e.x[2]-n.x elseif e and e.y then o=e.y[1]-n.y i=e.y[2]-n.y end self.track={ref=n,d={x=self.x-n.x,y=self.y-n.y},b={x={t,r},y={o,i}}}end return self end function tc:group(n,e)if e then n.elements[e]=self else ins(n.elements,self)end return self end function tc:active(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:active(e)end else self.activity=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:active()end return e else if self.activity~=nil then return self.activity end end end end function tc:visible(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:visible(e)end else self.visibility=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:visible()end return e else if self.activity~=nil then return self.visibility end end end end function tc:dragBounds(e)if e~=nil then self.drag.bounds=e else return self.drag.bounds end end function tc:horizontalRange(n)local e=self.drag.bounds if n~=nil then self.x=e.x[1]+(e.x[2]-e.x[1])*n else assert(e and e.x and#e.x==2,
+	"X bounds error!")return(self.x-e.x[1])/(e.x[2]-e.x[1])end end function tc:verticalRange(n)local e=self.drag.bounds if n~=nil then self.y=e.y[1]+(e.y[2]-e.y[1])*n else assert(e and e.y and#e.y==2,"Y bounds error!")return(self.y-e.y[1])/(e.y[2]-e.y[1])end end function tc:index(e)if e~=nil then if self.type=="group"then local n for t,e in pairs(self.elements)do if not n or e.z<n then n=e.z end end for r,t in pairs(self.elements)do local e=t.z-n+e t:index(e)end else self.z=e if e>tc.hz then tc.hz=e end end else return self.z end return end function tc:toFront()if self.z<tc.hz or self.type=="group"then return self:index(tc.hz+1)end end function tc:remove()for e=#tc.elements,1,-1 do if tc.elements[e]==self then rem(tc.elements,e)self=nil end end end function tc.empty()for e=1,#tc.elements do tc.elements[e]=nil end end
 
 	-- (Skaruts) convenience functions (also helps keeping under 64k)
 	function tc.enable(t)
@@ -291,16 +245,6 @@
 		pmem(i,b and 1or 0)
 		opts[i]=b
 	end
-
-	local dbg_times={ -- debug
-		input="0ms",
-		update="0ms",
-		ui_update="0ms",
-		gen="0ms",
-		render="0ms",
-		ui_render="0ms",
-		render_dbg="0ms",
-	}
 
 	local g_mx,g_my=0,0 -- grid mouse pos
 	local ct_mod,sh_mod,al_mod,mouse_on_ui=false,false,false,false
@@ -512,7 +456,7 @@ local tl,ui,rand_cells
 	function TxtBtn(x,y,tx,fn,args)
 		local e=UIElem(SS*x,SS*y,print(tx,0,-99)+2,8)
 		e.text=_text(tx,9,6,6,1,1,false,1,1)
-		e.onCleanRelease=function(t)if fn then fn(args and t_unpk(args)or nil)end end
+		e.onCleanRelease=function(t)if fn then fn(args and unpk(args)or nil)end end
 		return e
 	end
 
@@ -578,7 +522,7 @@ local tl,ui,rand_cells
 		e.onCleanRelease=function(t)t:toggle_state()end
 		e.toggle_state=function(t)t:hit()end
 		e.hit=function(t)
-			if fn then fn(args and t_unpk(args)or nil)end
+			if fn then fn(args and unpk(args)or nil)end
 		end
 		return e
 	end
@@ -869,21 +813,21 @@ local tl,ui,rand_cells
 	--   Scanline FT
 	local function scnln_ft(x, y, ellipse,v)
 		local pts={}
-		t_ins(pts,_vec_xy(x,y)) -- add the initial point
+		ins(pts,_vec_xy(x,y)) -- add the initial point
 
 		local s,c,tidx,pt,set_abv,set_blw,sy=cells[sel],cells[cur],#pts
 		repeat
-			pt = t_rem(pts)
+			pt = rem(pts)
 			set_abv,set_blw,sy,x=true,true,s[pt.y],pt.x
 			while not _has_pix(v,x,pt.y,s,c,ellipse)do
 				sy[x]=1
 				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then t_ins(pts,_vec_xy(x,pt.y-1))end
+					if not set_abv then ins(pts,_vec_xy(x,pt.y-1))end
 				end
 				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then t_ins(pts,_vec_xy(x,pt.y+1))end
+					if not set_blw then ins(pts,_vec_xy(x,pt.y+1))end
 				end
 				x=x+1
 			end
@@ -894,11 +838,11 @@ local tl,ui,rand_cells
 				sy[x]=1
 				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then t_ins(pts,_vec_xy(x,pt.y-1))end
+					if not set_abv then ins(pts,_vec_xy(x,pt.y-1))end
 				end
 				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then t_ins(pts,_vec_xy(x,pt.y+1))end
+					if not set_blw then ins(pts,_vec_xy(x,pt.y+1))end
 				end
 				x=x-1
 			end
@@ -1015,7 +959,6 @@ local tl,ui,rand_cells
 		orgn=nil,
 		w=0,
 		h=0,
-		is_drawing,
 		mode1=false,  -- filled
 		mode2=false,  -- square
 		mode3=false,  -- centered on mouse
@@ -1174,7 +1117,7 @@ local tl,ui,rand_cells
 		end
 	end
 
-	local _draw_fs = {
+	local _tl_draw_fns = {
 		brush   = _brush_pts,
 		rect    = _rect_pts,
 		circle  = _circle_pts,
@@ -1184,7 +1127,7 @@ local tl,ui,rand_cells
 	}
 
 	function tl.draw_points(x, y)
-		_draw_fs[tl.type](x, y)
+		_tl_draw_fns[tl.type](x, y)
 	end
 
 	local function _new_pat(id, name, layout)
@@ -1274,7 +1217,7 @@ local tl,ui,rand_cells
 	end
 
 	function set_padding(bool)
-		pad = bool == true and (CS < 4 and 0 or 1) or 0
+		pad = bool and (CS < 4 and 0 or 1) or 0
 	end
 
 	function rand_cells(rst)
@@ -1437,12 +1380,12 @@ local tl,ui,rand_cells
 
 	local function update_ui()
 	bma("ui update",function()--@bm
-		tc.update(mx, my, lmb, mmb, rmb)
+		tc.update(mx, my, m1, m3, m2)
 	end)--@bm
 	end
 
 	local function update(dt)
-	bma("update",function()--@bm
+	bma("update game",function()--@bm
 		if cur_scr == GAME_SCR then
 			update_tools()
 			-- if tl.is_drawing then monitor("bb  ", tl.bbox) end
@@ -1455,9 +1398,7 @@ local tl,ui,rand_cells
 			ui.lbl_mouse:set_text(opts[zoom_lvl].." | "..g_mx..", "..g_my)
 
 			if not paused then
-			bma("compute gen",function()--@bm
-				next_gen()
-			end)--@bm
+				bma("compute gen", next_gen)--@bm
 			end
 
 			ui.lbl_gens:set_text("G: "..gens)
@@ -1579,7 +1520,7 @@ local tl,ui,rand_cells
 -- input
 	local function handle_keys()
 		local k = keys
-		if keyp(DBG_KEY) then dbg:toggle()
+		if keyp(dbg.key) then dbg:toggle()
 		else
 			if     cur_scr >= OPTS_SCR then
 				if keyp(k.O) then toggle_options() end
@@ -1651,7 +1592,7 @@ local tl,ui,rand_cells
 	end
 
 	local function handle_mouse()
-		update_mouse()
+		update_mst()
 		g_mx = mx//CS+1
 		g_my = my//CS+1
 

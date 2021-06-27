@@ -1,7 +1,10 @@
 ## Todo:
 
+- [ ] improve UI and shorten the code
+- [ ] consider making zoom real (with panning)
+- [ ] add a mouse movement correction for the brush tool
 - [ ] replace TICuare for TICkle IMGUI, to save on character limits
-- [ ] add a finite state machine to the loop
+- [ ] add a finite state machine to the loop (also accounting for benchmarking on/off)
 - [ ] remove draw_dead_cells (it's redundant) in favor of just having a bg color
 - [ ] fix rect/circle proportional mode (it's broken when the mouse pos < origin)
 - [x] add a cycle-zoom button
