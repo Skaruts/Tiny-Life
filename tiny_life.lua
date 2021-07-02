@@ -1727,9 +1727,9 @@ local tl,rand_cells
 
 	function create_cells()
 		local b1,b2,b3={},{},{}
-		for j=1,GH do
+		for j=0,GH+1 do
 			b1[j],b2[j],b3[j]={},{},{}
-			for i=1,GW do
+			for i=0,GW+1 do
 				b1[j][i],b2[j][i],b3[j][i]=0,0,0
 			end
 		end
@@ -1793,71 +1793,36 @@ local tl,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- update
-	local function ng_wrap()
+
+	local function compute_gen()
 		cur,pre=pre,cur
 		-- the weirdness in here got me over 10ms and 20fps
-
 		local lc,p,c=0,cells[pre],cells[cur]	-- count alive cells, and make buffers local
 		local l,r,n,b,cj,pj,pu,pd -- this seems to give me ~2ms (and more token budget)
 
 		for j=1,GH do
 			-- make buffer rows local here for faster access
-			cj,pj,pu,pd=
-				c[j],
-				p[j],
-				p[(j-1<1 and GH or j-1)],
-				p[(j+1>GH and 1 or j+1)]
-
-			for i=1,GW do
-				l,r=(i-1<1 and GW or i-1),(i+1>GW and 1 or i+1)
-
-				-- count alive neighbors
-				n=pu[l]+pu[i]+pu[r]+pj[l]+pj[r]+pd[l]+pd[i]+pd[r]
-
-				b=(n==3or(n==2 and pj[i]==1))and 1 or 0
-				cj[i]=b
-				lc=lc+b
-			end
-		end
-		l_cells=lc
-	end
-
-	-- this is considerably slower than the wrapping function
-	local function ng_nowrap()
-		cur,pre=pre,cur
-
-		local lc,p,c=0,cells[pre],cells[cur]
-		local u,d,l,r,n,b,cj,pj,pu,pd
-
-		for j=1,GH do
-			u,d=j-1,j+1
-			cj,pd,pj,pu=c[j],p[d],p[j],p[u]
+			cj,pj,pu,pd=c[j],p[j],p[j-1],p[j+1]
 			for i=1,GW do
 				l,r=i-1,i+1
-
-				n=(pu and pu[l]or 0)
-				 +(pu and pu[i]or 0)
-				 +(pu and pu[r]or 0)
-				 +(pj[l]or 0)
-				 +(pj[r]or 0)
-				 +(pd and pd[l]or 0)
-				 +(pd and pd[i]or 0)
-				 +(pd and pd[r]or 0)
-
+				-- count alive neighbors
+				n=pu[l]+pu[i]+pu[r]+pj[l]+pj[r]+pd[l]+pd[i]+pd[r]
+				-- apply rules
 				b=(n==3or(n==2 and pj[i]==1))and 1 or 0
 				cj[i]=b
 				lc=lc+b
 			end
 		end
-		l_cells=lc
-	end
 
-	local function next_gen()
-		if opts[WRAP_AROUND] then
-			ng_wrap()
-		else
-			ng_nowrap()
+		if opts[WRAP_AROUND] then  -- swap borders
+			for i=0,GW-1 do
+				c[GH+1][i],c[0][i]=c[1][i],c[GH][i]
+			end
+			for j=1,GH do
+				c[j][GW+1],c[j][0]=c[j][1],c[j][GW]
+			end
 		end
+		l_cells=lc
 		gens=gens+1
 	end
 
@@ -1871,7 +1836,7 @@ local tl,rand_cells
 	end
 
 	local function update()
-	bma("update game",function()--@bm
+	bma("update",function()--@bm
 		if cur_scr == GAME_SCR then
 			-- if use_ibar then ui.lbl_nfo:set_text("") end
 
@@ -1881,9 +1846,11 @@ local tl,rand_cells
 			end
 			-- ui.lbl_mouse:set_text(opts[ZOOM_LVL].." | "..g_mx..", "..g_my)
 
-			if not paused and (upd_delay==0 or f%upd_delay==0) then
-				bma("compute gen", next_gen)--@bm
-			end
+			bma("compt gen", function()
+				if not paused and (upd_delay==0 or f%upd_delay==0) then
+					compute_gen()
+				end
+			end)--@bm
 
 			anim:update()
 			-- update_ui()
@@ -2089,7 +2056,7 @@ end
 				tl.mode3 = alt
 
 				if     keyp(k.SPACE)                then if shift then pause(true) else toggle_pause() end
-				elseif keyp(k.G,10,5)               then if paused then next_gen() end
+				elseif keyp(k.G,10,5)               then if paused then compute_gen() end
 				elseif keyp(k.ENTER)                then rand_cells(opts[RAND_RESET])
 				elseif keyp(k.PGUP)                 then dec_zoom()
 				elseif keyp(k.PGDN)                 then inc_zoom()
