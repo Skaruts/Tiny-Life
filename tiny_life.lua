@@ -995,7 +995,7 @@ local tl,rand_cells
 		},
 	}
 
-	local info_vis=true
+	local ui_vis,info_vis=true,true
 	function toggle_info()
 		info_vis=not info_vis
 	end
@@ -1828,7 +1828,7 @@ local tl,rand_cells
 
 	local function update_ui()
 	bma("ui update",function()--@bm
-		if cur_scr == GAME_SCR then
+		if cur_scr == GAME_SCR and ui_vis then
 			PlaybackBar("pb", pb_rect)
 			Toolbar("tb",tb_rect)
 		end
@@ -2170,7 +2170,7 @@ end
 	end
 
 	function toggle_ui()
-		ui.visible=not ui.visible
+		ui_vis=not ui_vis
 	end
 
 	function toggle_help()
