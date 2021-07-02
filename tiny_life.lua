@@ -14,8 +14,9 @@
 --    https://www.ibiblio.org/lifepatterns/
 --
 --    fast life algorithms:
---        https://stackoverflow.com/a/6164868
---        https://www.ibiblio.org/lifepatterns/lifeapplet.html
+--        https://stackoverflow.com/questions/3554552/game-of-life-memory-optimization
+--            - https://stackoverflow.com/a/6164868
+--            - https://www.ibiblio.org/lifepatterns/lifeapplet.html
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- utils & shortenings
 	local ins,sort,rem,conc,unpk=table.insert,table.sort,table.remove,table.concat,table.unpack
