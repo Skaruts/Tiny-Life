@@ -9,14 +9,17 @@
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- MIT License (c) 2019 Skaruts (MetalDudeBro)
 --=--=--=--=--=--=--=--=--=--=--=--=--
--- 62452
-
+-- RESEARCH:
+--    http://www.mirekw.com/ca/ca_files_formats.html
+--    https://www.ibiblio.org/lifepatterns/
+--
+--    fast life algorithms:
+--        https://stackoverflow.com/a/6164868
+--        https://www.ibiblio.org/lifepatterns/lifeapplet.html
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- utils & shortenings
-	local poke4,print,pix,spr,clip,rect,rectb=poke4,print,pix,spr,clip,rect,rectb
-
 	local ins,sort,rem,conc,unpk=table.insert,table.sort,table.remove,table.concat,table.unpack
-	local floor,ceil,max,min,abs,rand=math.floor,math.ceil,math.max,math.min,math.abs,math.random
+	local floor,ceil,max,min,abs,rand,sqrt=math.floor,math.ceil,math.max,math.min,math.abs,math.random,math.sqrt
 	local assert,tonum,tostr,type,setmt,getmt,pairs,ipairs=assert,tonumber,tostring,type,setmetatable,getmetatable,pairs,ipairs
 	local gsub,fmt,rep=string.gsub,string.format,string.rep
 
@@ -26,103 +29,183 @@
 		Q=17,R=18,S=19,T=20,U=21,V=22,W=23,X=24,Y=25,Z=26,
 		N0=27,N1=28,N2=29,N3=30,N4=31,N5=32,N6=33,N7=34,N8=35,N9=36,
 		CTRL=63,SHFT=64,ALT=65,
+		UP=58,DOWN=59,LEFT=60,RIGHT=61,
 	}
+	--[[ Debug drawing stuff                   003 ]]
+		-- TODO: add a grid-step choice
+		local function draw_dbg_grid(c)
+			c=c or 12
+			for i=0,240,8 do line(i,0,i,136,c)end
+			for j=0,136,8 do line(0,j,240,j,c)end
+		end
+		local function draw_dbg_center_lines(c)
+			c=c or 15
+			line(240/2,0,240/2,136,c)
+			line(0,136/2,240,136/2,c)
+		end
 
+	--[[ tm_check - time stuff / dt            003 ]]
+		-- call 'tsecs' without args to get current time in secs
+		-- call 'tm_check' at the start of every frame to update t/dt/t2
+		local f,t1,t2,dt,tsecs,tm_check=0,time()
+		function tsecs(ms) return (ms or time())/1000 end
+		function tm_check()
+			f=f+1
+			t2=time()
+			dt=(t2-t1)/1000
+			t1=t2
+		end
+	--[[ has - check if 'o' is in table 't'    001 ]] local function has(t,o) for i=1,#t do if t[i]==o then return true end end end
+	--[[ dmerge - merge dict/hash tables       001 ]] local function dmerge(a,b,err,...) local has,type=has,type err=err or"Key '%s' already exists in table."local t={} for k,v in pairs(a)do if type(k)~="number"then t[k]=v end end for k,v in pairs(b)do if type(k)~="number" then if has(t,k)then print(fmt(err,...or k)) else t[k]=v end end end return t end
 
 	--[[ clamp - keep v between l and h        002 ]] local function clamp(v,l,h)return max(l,min(v,h))end
 	--[[ wrap - wrap v around l and h          003 ]] local function wrap(v,l,h) return v > h and l or v<l and h or v end
 	--[[ round - round v to nearest int        003 ]] local function round(v)return floor(v+0.5)end
 	--[[ lerp - linear interpolate             002 ]] local function lerp(a,b,t)return a*(1-t)+b*t end
-	--[[ printgs - print on grid with shadow   009 ]] local function printgs(t,x,y,c,sc,fw,s,ox,oy) fw,s,sc=fw or false,s or 1,sc or 1 x,y=x*8+1+(ox or 0),y*8+1+(oy or 0) print(t,x+1,y+1,sc,fw,s) print(t,x,y,c,fw,s) end
-	--[[ printgsc - print grid/shadow/centered 010 ]] local function printgsc(tx,x,y,c,sc,fw,s) fw,s,sc=fw or false,s or 1,sc or 1 if not x then x=(240//8)//2-(txtw(tx)//8)//2 end if not y then y=(136//8)//2 end print(tx,x*8+1,y*8+1,sc,fw,s) print(tx,x*8,y*8,c,fw,s) end
-
-	--[[ Print grid w/ drop shadow           (0.06) ]]
-		local shad_c=3 -- shadow_color
-		local function prints(t,x,y,c,fix_w,ofx,ofy)
-			if not y then return print(t,-999,-999, 0, x) end
-			local xc,yc,ofx,ofy=1,1,ofx or 0,ofy or 0
-			print(t,x*8+xc+ofx+1,y*8+yc+ofy+1,shad_c,fix_w,1)
-			print(t,x*8+xc+ofx,y*8+yc+ofy,c,fix_w,1)
-		end
-	--[[ Print grid w/ drop shadow centered  (0.07) ]] local function printc(t,x,y,c,fix_w)local xc,yc,c,len=1,1,c or 15,print(t,-999,-999)x=x==nil and(240-len)//2or x*8 y=y==nil and 136//2-8//2or y*8 print(t,x+xc+1,y+yc+1,shad_c,fix_w)print(t,x+xc,y+yc,c,fix_w)end
 
 	--[[ txtw - get text width                 002 ]] local function txtw(tx,fw,s,sf) return print(tx,0,-99,-1,fw or false,s or 1,sf or false) end
-	--[[ tracef - trace formatted              001 ]] local function tracef(...) trace(fmt(...)) end
-	--[[ tracec - trace csv arguments          003 ]] local function tracec(...) local t={} for i=1,select("#",...)do t[i]=tostr(select(i,...)) end trace(conc(t,",")) end
-	--[[ Debug/benchmark utilities             018 ]] local _f,monitor,bm,bma=1 local dbg={key=41, fg=6, bg=2, active=false, use_padding=true, fixw=true, h=0,w=0,vals=nil,reg={}, toggle=function(t)t.active=not t.active end, spaced=function(t,b)t.use_padding=b end, draw=function(t) _f=_f+1 if _f>500 then _f=1 for k,_ in pairs(t.reg)do t.reg[k]=0 end end if not t.active then return end if t.use_padding then local w=t.w*8-t.w*2 rect(0,0,w+8,t.h*8+8,t.bg) for i=1,#t.vals do print(t.vals[i],2,(i-1)*8+2,t.fg,t.fixw) end t.vals,t.w={},0 else local w=txtw(t.vals,t.fixw) rect(0,0,w+8,(t.h+1)*6,t.bg) print(t.vals,2,2,t.fg,t.fixw) t.vals=""end t.h=0 end, } dbg.vals=dbg.use_padding and{}or""function monitor(k,v,n) local t=dbg if not t.active then return end if t.use_padding then local s if v==nil then s=k elseif k~=""then if n then k=k..rep(' ',n-#k) end s=conc({k,tostr(v)}) else s=tostr(v) end t.vals[#t.vals+1]=s if #s>t.w then t.w=#s end else if v==nil then t.vals=conc({t.vals,k,'\n'}) elseif k~=""then if n then k=k..rep(' ',n-#k) end t.vals=conc({t.vals,k,tostr(v),'\n'}) else t.vals=conc({t.vals,tostr(v),'\n'}) end end t.h=t.h+1 end function bm(id,f) local tm=time() f() monitor(id, fmt("%.2fms",time()-tm)) end function bma(id,f) local rg,t1,t2,s=dbg.reg if not rg[id]then rg[id]=0 end t1=time() f() t2=time()-t1 s=fmt("%.2fms",t2) rg[id]=rg[id]+t2 s=s..rep(' ',9-#s)..fmt("%.2fms",rg[id]/_f) monitor(id..rep(' ',11-#id),s) end
+	--[[ prints - print with shadow            003 ]]
+		local function prints(tx,x,y,c,sc,fw,s,sf)
+			fw,s,sc,sf=fw or false,s or 1,sc or 1,sf or false
+			print(tx,x+1,y+1,sc,fw,s,sf)
+			print(tx,x,y,c,fw,s,sf)
+		end
+	--[[ printgs - print on grid with shadow   009 ]]
+		local function printgs(t,x,y,c,sc,fw,s,ox,oy)
+			fw,s,sc=fw or false,s or 1,sc or 1
+			x,y=x*8+1+(ox or 0),y*8+1+(oy or 0)
+			print(t,x+1,y+1,sc,fw,s)
+			print(t,x,y,c,fw,s)
+		end
+	--[[ printgsc - print grid/shadow/centered 010 ]] local function printgsc(tx,x,y,c,sc,fw,s) fw,s,sc=fw or false,s or 1,sc or 1 if not x then x=(240//8)//2-(txtw(tx)//8)//2 end if not y then y=(136//8)//2 end print(tx,x*8+1,y*8+1,sc,fw,s) print(tx,x*8,y*8,c,fw,s) end
+	--[[ Print grid w/ drop shadow centered  (0.07) ]] local function printc(t,x,y,c,fix_w)local xc,yc,c,len=1,1,c or 15,print(t,-999,-999)x=x==nil and(240-len)//2or x*8 y=y==nil and 136//2-8//2or y*8 print(t,x+xc+1,y+yc+1,shad_c,fix_w)print(t,x+xc,y+yc,c,fix_w)end
+	--[[ printgo - print grid/outline          001 ]]
+		local function printgo(tx,x,y,c,oc)
+			x,y=x*8,y*8
+			for j=y-1,y+1 do
+				for i=x-1,x+1 do
+					print(tx,i,j,oc)
+				end
+			end
+			print(tx,x,y,c)
+		end
+	--[[ printo - print with outline           003 ]]
+		-- Use whichever version is preferable. The second one
+		-- can be tweaked to only do diagonals or sides, making
+		-- a thinner outline.
+		local function printo(tx,x,y,c,oc,fw,s,sf)
+			fw,s,oc,sf=fw or false,s or 1,oc or 1,sf or false
+			for j=y-1,y+1 do
+				for i=x-1,x+1 do
+					print(tx,i,j,oc,fw,s,sf)
+				end
+			end
+			print(tx,x,y,c,fw,s,sf)
+		end
+
+	--[[ string.split - split string at 'sp'   001 ]]
+		-- split string by delimiter 'sp'
+		-- TODO: iirc this had some edge case issues
+		local _DEF_PAT,_L_PAT,_R_PAT='([^, ]+)','([^',']+)'
+		-- 'sp' is a string that lists separators to be used
+		function string.split(s,sp)
+			local t={}
+			if sp=="" then
+				for i=1,#s do
+				    t[#t+1]=s:sub(i,i)
+				end
+			else
+				sp=sp and _L_PAT..sp.._R_PAT or _DEF_PAT
+				for word in s:gmatch(sp)do
+				    t[#t+1]=word
+				end
+			end
+			return t
+		end
+
+	--[[ tracef - trace formatted              001 ]] function tracef(...) trace(fmt(...)) end
+	--[[ tracec - trace csv arguments          003 ]] function tracec(...) local t={} for i=1,select("#",...)do t[i]=tostr(select(i,...)) end trace(conc(t,",")) end
+
+	--[[ trace1d - trace a 1D array            001 ]]
+		local function trace1d(t)
+			-- TODO: couldn't this just use table.concat, like 'trace2d' does?
+			local s=""
+			for i,v in ipairs(t)do
+				s=s..v..","
+			end
+			trace(s)
+		end
 	--[[ Vector2 (stripped)             (0.02) ]]
-		local _VECMT={}
-		local function _vec_xy(x,y)return setmt({x=x,y=y},_VECMT)end
+		local _VECMT,vecv,vec0,vec2={}
 		_VECMT={
 			__index=_VECMT,
 			__tostring=function(t)return fmt("(%s,%s)",t.x,t.y)end,
-			__add=function(a,b)return type(b)=="number"and _vec_xy(a.x+b,a.y+b)or _vec_xy(a.x+b.x,a.y+b.y)end,
-			__sub=function(a,b)return type(b)=="number"and _vec_xy(a.x-b,a.y-b)or _vec_xy(a.x-b.x,a.y-b.y)end,
-			__mul=function(a,b)return type(b)=="number"and _vec_xy(a.x*b,a.y*b)or _vec_xy(a.x*b.x,a.y*b.y)end,
-			__div=function(a,b)return type(b)=="number"and _vec_xy(a.x/b,a.y/b)or _vec_xy(a.x/b.x,a.y/b.y)end,
-			__idiv=function(a,b)return type(b)=="number"and _vec_xy(a.x//b,a.y//b)or _vec_xy(a.x//b.x,a.y//b.y)end,
+			__add=function(a,b)return type(b)=="number"and vec2(a.x+b,a.y+b)or vec2(a.x+b.x,a.y+b.y)end,
+			__sub=function(a,b)return type(b)=="number"and vec2(a.x-b,a.y-b)or vec2(a.x-b.x,a.y-b.y)end,
+			__mul=function(a,b)return type(b)=="number"and vec2(a.x*b,a.y*b)or vec2(a.x*b.x,a.y*b.y)end,
+			__div=function(a,b)return type(b)=="number"and vec2(a.x/b,a.y/b)or vec2(a.x/b.x,a.y/b.y)end,
+			__idiv=function(a,b)return type(b)=="number"and vec2(a.x//b,a.y//b)or vec2(a.x//b.x,a.y//b.y)end,
 			__eq=function(a,b)return a.x==b.x and a.y==b.y end,
+			abs=function(v)return vec2(abs(v.x),abs(v.y))end,
 		}
-		local function vec(x,y)
-			if not x then return setmt({x=0,y=0},_VECMT)end
-			if not y then
-				y=x.y or x[2]
-				x=x.x or x[1]
-			end
-			return setmt({x=x,y=y},_VECMT)
-		end
-	--[[ Rect (stripped)                (0.01) ]]
-		local bi_err,_RECREADONLY,_RECI,_RECNI="bad index '%s' for rect",{c=true,tl=true,tr=true,bl=true,br=true},
-		{
+		function vecv(v)return setmt({x=v.x or v[1],y=v.y or v[2]},_VECMT)end
+		function vec0()return setmt({x=0,y=0},_VECMT)end
+		function vec2(x,y)return setmt({x=x,y=y},_VECMT)end
+	--[[ rec - a rectangle object              004 ]]
+		local _RMT,_REC_RO,_RILUT,_RNILUT,rec0,recr,recv,rec2={}
+		function rec0()return setmt({x=0,y=0,w=0,h=0},_RMT)end
+		function recr(r)return setmt({x=r.x or r[1],y=r.y or r[2],w=r.w or r[3],h=r.h or r[4]},_RMT)end
+		function rec2(a,b)return setmt({x=a.x or a[1],y=a.y or a[2],w=b.x or b[1],h=b.y or b[2]},_RMT)end
+		function rec4(x,y,w,h)return setmt({x=x,y=y,w=w,h=h},_RMT)end
+		_REC_RO={c=true,tl=true,br=true}
+		_RILUT={
 			x2=function(t,k)return t.x+t.w end,
 			y2=function(t,k)return t.y+t.h end,
-			c=function(t,k)return vec((t.x+t.x+t.w)//2,(t.y+t.y+t.h)//2)end,
-			tl=function(t,k)return vec(t.x,t.y)end,
-			tr=function(t,k)return vec(t.x+t.w,t.y)end,
-			bl=function(t,k)return vec(t.x,t.y+t.h)end,
-			br=function(t,k)return vec(t.x+t.w,t.y+t.h)end,
-		},{
+			c=function(t,k)return vec2((t.x+t.x+t.w)//2,(t.y+t.y+t.h)//2)end,
+			tl=function(t,k)return vec2(t.x,t.y)end,
+			br=function(t,k)return vec2(t.x+t.w,t.y+t.h)end,
+			p=function(t,k)return vec2(t.x,t.y)end,
+			s=function(t,k)return vec2(t.w,t.h)end,
+		}
+		_RNILUT={
 			x2=function(t,v)t.w=v-t.x end,
 			y2=function(t,v)t.h=v-t.y end,
+			p=function(t,v)t.x,t.y=v.x,v.y end,
+			s=function(t,v)t.w,t.h=v.x,v.y end,
 		}
-		local _RECMT={}
-		local function _rect(x,y,w,h)return setmt({x=x,y=y,w=w,h=h},_RECMT)end
-		local function Rect(x,y,w,h)
-			if not x then return setmt({x=0,y=0,w=0,h=0},_RECMT)end
-			if not h then
-				if not y then return _rect(x.x or x[1],x.y or x[2],x.w or x[3],x.h or x[4])end
-				return _rect(x.x or x[1],x.y or x[2],y.x or y[1],y.y or y[2])
-			end
-			return _rect(x,y,w,h)
-		end
-		_RECMT={
+		_RMT={
 			__index=function(t,k)
-				if _RECMT[k]~= nil then return _RECMT[k]end
-				if _RECI[k]then return _RECI[k](t,k)end
-				error(fmt(bi_err,tostr(k)))
+				if _RMT[k]~=nil then return _RMT[k]end
+				if _RILUT[k]then return _RILUT[k](t,k)end
+				error(fmt("bad index '%s' for rect",tostr(k)),2)
 			end,
 			__newindex=function(t,k,v)
-				if _RECREADONLY[k]then error(fmt("'%s' is read only",tostr(k)))end
-				if _RECNI[k]then return _RECNI[k](t,v)end
-				error(fmt(bi_err,tostr(k)))
+				if _REC_RO[k]then error(fmt("'%s' is read only",tostr(k)))end
+				if _RNILUT[k]then return _RNILUT[k](t,v)end
+				error(fmt("bad new index '%s' for rect",tostr(k)),2)
 			end,
-			__tostring=function(t) return fmt("(%d,%d,%d,%d)", t.x, t.y, t.w, t.h) end,
+			__tostring=function(t)return fmt("(%s,%s,%s,%s)",t.x,t.y,t.w,t.h)end,
 			__eq=function(t,o)return t.x==o.x and t.y==o.y and t.w==o.w and t.h==o.h end,
+
 			sq=function(t)
-				return _rect(
+				return rec4(
 					t.x, t.y,
 					t.w > t.h and t.h or t.w,
 					t.w > t.h and t.h or t.w
 				)
 			end,
 		}
-	--[[ Bresenham stuff                (0.01) ]]
-		local Bres = {
-			line=function(x1,y1,x2,y2)
+	--[[ Bresenham Stuff                       004 ]]
+		local Bres={}
+		Bres={
+			line=function(x1,y1,x2,y2,exclude_start)
+				exclude_start=exclude_start or false
 				local pts,dtx,dty={},x2-x1,y2-y1
 				local ix,iy=dtx>0 and 1or-1,dty>0 and 1or-1
 				dtx,dty=2*abs(dtx),2*abs(dty)
-				pts[#pts+1]=_vec_xy(x1,y1)
+				if not exclude_start then
+					pts[#pts+1]={x=x1,y=y1}
+				end
 				if dtx>=dty then
 					err=dty-dtx/2
 					while x1~=x2 do
@@ -130,7 +213,7 @@
 							err,y1=err-dtx,y1+iy
 						end
 						err,x1=err+dty,x1+ix
-						pts[#pts+1]=_vec_xy(x1,y1)
+						pts[#pts+1]={x=x1,y=y1}
 					end
 				else
 					err=dtx-dty/2
@@ -139,13 +222,84 @@
 							err,x1=err-dty,x1+ix
 						end
 						err,y1=err+dtx,y1+iy
-						pts[#pts+1]=_vec_xy(x1,y1)
+						pts[#pts+1]={x=x1,y=y1}
 					end
 				end
 				return pts
 			end,
+			-- not working properly
+			ellipse=function(xc,yc,w,h)
+				if w<=0 or h<=0 then return{}end
+				local pts,a2,b2,x,y,sig={},w*w,h*h,0,0,0
+				local p=function(x,y)pts[#pts+1]={x=x,y=y}end
+				local _put_pts=function(xc,yc,x,y)
+					p(xc+x,yc+y)
+					p(xc-x,yc+y)
+					p(xc+x,yc-y)
+					p(xc-x,yc-y)
+				end
+
+				local fa2,fb2=4*a2,4*b2
+
+				-- first half
+				x,y=0,h
+				sig=2*b2+a2*(1-2*h)
+				while b2*x<=a2*y do
+					_put_pts(xc,yc,x,y)
+					if sig>=0 then
+						sig=sig+fa2*(1-y)
+						y=y-1
+					end
+					sig=sig+b2*((4*x)+6)
+					x=x+1
+				end
+				-- second half
+				x,y=w,0
+				sig=2*a2+b2*(1-2*w)
+				while a2*y<=b2*x do
+					_put_pts(xc,yc,x,y)
+					if sig>=0 then
+						sig=sig+fb2*(1-x)
+						x=x-1
+					end
+					sig=sig+a2*((4*y)+6)
+					y=y+1
+				end
+				return pts
+			end,
+			circle=function(xc,yc,r)
+				-- TODO: test this
+				local pts={}
+				-- TODO: are inner functions like these bad?
+				local p=function(x,y)pts[#pts+1]={x=x,y=y}end
+				local circle=function(xc,yc,x,y)
+					p(xc+x,yc+y)
+					p(xc-x,yc+y)
+					p(xc+x,yc-y)
+					p(xc-x,yc-y)
+					p(xc+y,yc+x)
+					p(xc-y,yc+x)
+					p(xc+y,yc-x)
+					p(xc-y,yc-x)
+				end
+
+				local x,y,d=0,r,3-2*r
+
+				circle(xc,yc,x,y)
+				while y>=x do
+					x=x+1
+					if d>0 then
+						y=y-1
+						d=d+4*(x-y)+10
+					else
+						d=d+4*x+6
+					end
+					circle(xc,yc,x,y)
+				end
+				return pts
+			end
 		}
-	--[[ Mouse States                          006 ]]
+	--[[ Mouse States                          007 ]]
 		local mx,my,mwx,mwy,lmx,lmy,rmx,rmy=0,0,0,0,0,0,0,0
 		local M1,M2,M3,m1,m2,m3=1,2,3,false,false,false
 		local m_stt={prev={0,0,0},curr={0,0,0}}
@@ -175,6 +329,9 @@
 		function update_mst()
 			lmx,lmy=mx,my
 			mx,my,m1,m3,m2,mwx,mwy=mouse()
+			-- attempt to fix negative mouse issue
+			if mx==255 and lmx<120 then mx=-1 end
+			if my==255 and lmy<68 then my=-1 end
 			rmx,rmy=mx-lmx,my-lmy
 			m_stt.prev={m_stt.curr[1],m_stt.curr[2],m_stt.curr[3]}
 			m_stt.curr={0,0,0}
@@ -185,172 +342,887 @@
 		function mmoved()
 			return mx~=lmx or my~=lmy
 		end
+	--[[ Debug/benchmark utilities             018 ]] local _f,monitor,bm,bma=1 local dbg={key=41, fg=6, bg=2, active=false, use_padding=true, fixw=true, h=0,w=0,vals=nil,reg={}, toggle=function(t)t.active=not t.active end, spaced=function(t,b)t.use_padding=b end, draw=function(t) _f=_f+1 if _f>500 then _f=1 for k,_ in pairs(t.reg)do t.reg[k]=0 end end if not t.active then return end if t.use_padding then local w=t.w*8-t.w*2 rect(0,0,w+8,t.h*8+8,t.bg) for i=1,#t.vals do print(t.vals[i],2,(i-1)*8+2,t.fg,t.fixw) end t.vals,t.w={},0 else local w=txtw(t.vals,t.fixw) rect(0,0,w+8,(t.h+1)*6,t.bg) print(t.vals,2,2,t.fg,t.fixw) t.vals=""end t.h=0 end, } dbg.vals=dbg.use_padding and{}or""function monitor(k,v,n) local t=dbg if not t.active then return end if t.use_padding then local s if v==nil then s=k elseif k~=""then if n then k=k..rep(' ',n-#k) end s=conc({k,tostr(v)}) else s=tostr(v) end t.vals[#t.vals+1]=s if #s>t.w then t.w=#s end else if v==nil then t.vals=conc({t.vals,k,'\n'}) elseif k~=""then if n then k=k..rep(' ',n-#k) end t.vals=conc({t.vals,k,tostr(v),'\n'}) else t.vals=conc({t.vals,tostr(v),'\n'}) end end t.h=t.h+1 end function bm(id,f) local tm=time() f() monitor(id, fmt("%.2fms",time()-tm)) end function bma(id,f) local rg,t1,t2,s=dbg.reg if not rg[id]then rg[id]=0 end t1=time() f() t2=time()-t1 s=fmt("%.2fms",t2) rg[id]=rg[id]+t2 s=s..rep(' ',9-#s)..fmt("%.2fms",rg[id]/_f) monitor(id..rep(' ',11-#id),s) end
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
+	--[[ TICkle IMGUI                           011 ]]
+		-- https://github.com/Skaruts/TIC-80-utils-and-libs/tree/main/TICkle
+		-- depends on
+		--     unpk, setmt, fmt  (common_shortenings.lua)
+		--     mouse_states      (mouse/mouse_states.lua)
+		--     dmerge            (table_utils.lua)
+		--     clip/with_clip    (drawing_utils.lua)
+		--
+		-- TODO: find a way to detatch tooltip from ui, to allow user
+		--       to implement it however he wants. Make it an extension?
+		--       Problem is, the tooltip needs some time-keeping/updating...
+		--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       Base Stuff
+			-- locked means frozen (e.g. when a modal popup takes over)
+			-- inactive means frozen and faded
 
+			local _NID,_NIT,_NOK="NO_ID","NO_ITEM","NO_KEY"
+			local ui={
+				visible=true,
+				active=true,
+				locked=false,
+				mouse_on_ui=false,
+				shift=false,
+				ctrl=false,
+				alt=false,
+				info_item=_NIT,
+				_rend_steps={},
+				_addons={},
+				_items={},
+				_curr={hovd=_NID,prsd=_NID},
+				_prev={hovd=_NID,prsd=_NID},
+				_cache={i={},h={},p={}},
+				_kb_focus=_NID,
+				_key_entered=_NOK,
+				_key_char=nil,
+				_text_changed=false,
+				_it_state_changed=false,
+				_timer={
+					on=false,
+					t=0,
+					elapsed=0,
+					cooldown=0,
+				},
+			}
 
---=--=--=--=--=--=--=--=--=--=--=--=--
--- Ticuare
-	-- TICuare - A UI library for TIC-80
-	--
-	-- Copyright (c) 2017 Crutiatix
-	-- Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-	-- The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-	-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-	tc={name="tc",elements={},z=1,hz=nil}tc.__index=tc tc.me={nothing=0,click=1,noclick=2,none=3}local e={__index=tc}local function u(r,e,n,t,o,i)return r>n and r<n+o and e>t and e<t+i end local function R(e,o,t)for n,r in pairs(o)do if type(r)=="table"then if type(e[n]or false)=="table"then R(e[n]or{},o[n]or{},t)else if not e[n]or t then e[n]=r end end else if not e[n]or t then e[n]=r end end end return e end local function i(e,n)if(e==nil and	n==nil)then for e=0,15 do poke4(16368*2+e,e)end else poke4(16368*2+e,n)end end function tc.lerp(e,n,t)if e==n then return e else if abs(e-n)<.005 then return n else return e*(1-t)+n*t end end end local function F(o)local t={}local function r(e)if type(e)~="table"then return e elseif t[e]then return t[e]end local n={}t[e]=n for t,e in pairs(e)do n[r(t)]=r(e)end return setmt(n,getmt(e))end return r(o)end local function f(o,r,t,n,e)if o then return t elseif r then return n else return e end end function tc.print(t,i,a,o,n,e)n=n or false e=e or 1 local d,r=gsub(t,"\n","")local w,h if o then w,h=print(t,i,a,o,n,e),(6+r)*e*(r+1)end return w,h end function tc.font(c,s,f,r,e,a,n,o,t)e=e or-1 a=a or 8 n=n or 8 o=o or false t=t or 1 local
-	d,l=gsub(c,"\n","")if type(e)=="table"and type(e[1])=="table"then for t,n in ipairs(e[1])do if type(r)=="table"then i(n,r[t])else i(n,r)end end e=e[2]end local d if r then d=font(c,s,f,e,a,n,o,t)end i()return d,(n+l)*t*(1+l)end function tc.element(t,n)if not n then n=t t="element"end local e=n setmt(e,tc)e.hover,e.click=false,false e.activity=n.activity or true e.drag=n.drag or{activity=false}e.align=n.align or{x=0,y=0}e.visibility=n.visibility or true if e.content then if not e.content.scroll then e.content.scroll={x=0,y=0}end e.content.w,e.content.h=e.content.w or e.w,e.content.h or e.h end e.type,e.z=t,tc.z tc.z=tc.z+1 tc.hz=tc.z ins(tc.elements,e)return e end function tc.Element(e)return tc.element("element",e)end function tc.Style(e)return e end function tc.Group()local e={type="group",elements={}}setmt(e,tc)return e end function tc:updateSelf(e)if e.mouse_x and e.mouse_y and e.event then mouse_x=e.mouse_x mouse_y=e.mouse_y mouse_press=e.press mouse_event=e.event local a,d,n,t,r,e,e local e,i,o=tc.me,self.x-(self.align.x==1 and self.w*.5 or(self.align.x==2 and self.w or 0)),self.y-(self.align.y==1 and self.h*.5-1 or(self.align.y==2
-	and self.h-1 or 0))a=mouse_event~=e.none and mouse_press or false d=u(mouse_x,mouse_y,i,o,self.w,self.h)n=mouse_event~=e.none and d or false t,r=self.hover,self.hold self.hover=n or(self.drag.active and tc.draging_obj and tc.draging_obj.obj==self)self.hold=((mouse_event==e.click and n)and true)or(a and self.hold)or((n and mouse_event~=e.noclick and self.hold))if mouse_event==e.click and n and self.onClick then self.onClick(self)elseif(mouse_event==e.noclick and n and r)and self.onCleanRelease then self.onCleanRelease(self)elseif((mouse_event==e.noclick and n and r)or(self.hold and	not n))and self.onRelease then self.onRelease(self)elseif self.hold and self.onPress then self.onPress(self)elseif not t and self.hover and	self.onStartHover then self.onStartHover(self)elseif self.hover and self.onHover then self.onHover(self)elseif t and not self.hover and self.onEndHover then self.onEndHover(self)end if self.hold and(not n or self.drag.active)and not tc.draging_obj then self.hold=self.drag.active	tc.draging_obj={obj=self,d={x=i-mouse_x,y=o-mouse_y}}elseif not self.hold and n and(tc.draging_obj and tc.draging_obj.obj==self)then self.hold=true
-	tc.draging_obj=nil end if tc.draging_obj and tc.draging_obj.obj==self and self.drag.active then self.x=(not self.drag.fixed or not self.drag.fixed.x)and mouse_x+tc.draging_obj.d.x or self.x self.y=(not self.drag.fixed or not self.drag.fixed.y)and mouse_y+tc.draging_obj.d.y or self.y local e=self.drag.bounds if e then if e.x then self.x=(e.x[1]and self.x<e.x[1])and e.x[1]or self.x self.x=(e.x[2]and self.x>e.x[2])and e.x[2]or self.x end if e.y then self.y=(e.y[1]and self.y<e.y[1])and e.y[1]or self.y self.y=(e.y[2]and self.y>e.y[2])and e.y[2]or self.y end end if self.track then self:anchor(self.track.ref)end end return n elseif e.focused_element and e.event then local t,i,a,n,r,o=tc.me i=e.event~=t.none and e.press or false a=self==e.focused_element n=e.event~=t.none and a or false r,o=self.hover,self.hold self.hover=n self.hold=((e.event==t.click and n)and true)or(i and self.hold)or((n and e.event~=t.noclick and self.hold))if e.event==t.click and n and self.onClick then self.onClick(self)elseif(e.event==t.noclick and n and o)and self.onCleanRelease then self.onCleanRelease(self)elseif((e.event==t.noclick and n and o)or(self.hold and not n))and self.onRelease then
-	self.onRelease(self)elseif self.hold and self.onPress then self.onPress(self)elseif not r and self.hover and self.onStartHover then self.onStartHover(self)elseif self.hover and self.onHover then self.onHover(self)elseif r and not self.hover and self.onEndHover then self.onEndHover(self)end return n	else error("updateSelf error in arguments!")end end function tc:updateTrack()local n,e=self.drag.bounds,self.track if e then self.x,self.y=e.ref.x+e.d.x,e.ref.y+e.d.y if n and n.relative then if n.x then n.x[1]=e.ref.x+e.b.x[1]or nil n.x[2]=e.ref.x+e.b.x[2]or nil end if n.y then n.y[1]=e.ref.y+e.b.y[1]or nil n.y[2]=e.ref.y+e.b.y[2]or nil end end end end function tc:drawSelf()if self.visibility then local S,C,R,h,j,v,u,P,o,r,m,_,p,b,k,z,s,x,e,i,l,d,H,y,g local c,a,e,t,n,w=self.shadow,self.border,self.text,self.icon,self.tiled,self.colors o=self.x-(self.align.x==1 and self.w*.5-1 or(self.align.x==2 and self.w-1 or 0))r=self.y-(self.align.y==1 and self.h*.5-1 or(self.align.y==2 and self.h-1 or 0))if c and c.colors then c.offset=c.offset or{x=1,y=1}C=f(self.hold,self.hover,c.colors[3],c.colors[2],c.colors[1])if C then rect(o+c.offset.x,r+c.offset.y,self.w,self.h,C)end end if
-	w then S=f(self.hold,self.hover,w[3],w[2],w[1])if S then rect(o,r,self.w,self.h,S)end end i=a and(a.width)or 0 y=2*i if n then n.scale=n.scale or 1 n.key=n.key or-1 n.flip=n.flip or 0 n.rotate=n.rotate or 0 n.w=n.w or 1 n.h=n.h or 1 H=f(self.hold,self.hover,n.sprites[3],n.sprites[2],n.sprites[1])if H then clip(o+i,r+i,self.w-y,self.h-y)for e=0,self.w+(8*n.w)*n.scale,(8*n.w)*n.scale do for t=0,self.h+(8*n.h)*n.scale,(8*n.h)*n.scale do spr(H,o+e+i,r+t+i,n.key,n.scale,n.flip,n.rotate,n.w,n.h)end end clip()end end if self.content and self.drawContent then if self.content.wrap and clip then clip(o+i,r+i,self.w-y,self.h-y)end self:renderContent()if self.content.wrap and clip then clip()end end if a and a.colors then k=a.colors R=f(self.hold,self.hover,k[3],k[2],k[1])if R then for e=0,a.width-1 do rectb(o+e,r+e,self.w-2*e,self.h-2*e,R)end end end if a and a.sprites then l=a.key or-1 d=f(self.hold,self.hover,a.sprites[3],a.sprites[2],a.sprites[1])if d then clip(o+8,r,self.w-16+1,self.h)for e=8,self.w-9,8 do spr(d[2],o+e,r,l,1,0,0)spr(d[2],o+e,r+self.h-8,l,1,0,2)end clip()spr(d[1],o,r,l,1,0,0)spr(d[1],o+self.w-8,r,l,1,0,1)clip(o,r+8,self.w,self.h-16+1)for e=8,self.h-9,8 do spr(d[2],
-	o,r+e,l,1,0,3)spr(d[2],o+self.w-8,r+e,l,1,2,1)end clip()spr(d[1],o+self.w-8,r+self.h-8,l,1,0,2)spr(d[1],o,r+self.h-8,l,1,0,3)end end if t and t.sprites and#t.sprites>0 then P=((self.hold and t.sprites[3])and t.sprites[3])or((self.hover and t.sprites[2])and t.sprites[2])or t.sprites[1]z=t.offset or{x=0,y=0}t.align=t.align or{x=0,y=0}spr(P,(o+(t.align.x==1 and self.w*.5-((t.scale*8)/2)or(t.align.x==2 and self.w-(t.scale*8)or 0))+z.x),(r+(t.align.y==1 and self.h*.5-((t.scale*8)/2)or(t.align.y==2 and self.h-(t.scale*8)or 0))+z.y),t.key,t.scale,t.flip,t.rotate,t.w,t.h)end if e and e.print then u=e.colors or{15,15,15}u[1]=u[1]or 15 j=f(self.hold,self.hover,u[3],u[2],u[1])if e.shadow then v=e.shadow h=f(self.hold,self.hover,v.colors[3],v.colors[2],v.colors[1])x=v.offset or{x=1,y=1}end s=e.offset or{x=0,y=0}if e.font then e.space=e.space or{w=8,h=8}m,_=tc.font(e.print,0,200,-1,e.key,e.space.w,e.space.h,e.fixed,e.scale)else m,_=tc.print(e.print,0,200,-1,e.fixed,e.scale)end g=e.align or{x=0,y=0}p=(g.x==1 and o+((self.w*.5)-(m*.5))+s.x or(g.x==2 and o+((self.w)-(m))+s.x-i or o+s.x+i))b=(g.y==1 and r+((self.h*.5)-(_*.5))+s.y or(g.y==2 and r+((self.h)-(_))+s.y-i or r+
-	s.y+i))if e.font then if type(h)=="table"then tc.font(e.print,p+x.x,b+x.y,h,e.key,e.space.w,e.space.h,e.fixed,e.scale)end tc.font(e.print,p,b,j,e.key,e.space.w,e.space.h,e.fixed,e.scale)else if h then tc.print(e.print,p+x.x,b+x.y,h,e.fixed,e.scale)end tc.print(e.print,p,b,j,e.fixed,e.scale)end end end end function tc:renderContent()local i,o,n,t,r,e e=self.align i=self.x-(e.x==1 and self.w*.5 or(e.x==2 and self.w or 0))o=self.y-(e.y==1 and self.h*.5-1 or(e.y==2 and self.h-1 or 0))n=self.border and self.border.width or 1 t=i-(self.content.scroll.x or 0)*(self.content.w-self.w)+n r=o-(self.content.scroll.y or 0)*(self.content.h-self.h)+n self.drawContent(self,t,r)end function tc:Content(e)self.drawContent=e return self end function tc:scroll(e)if e~=nil then e.x=e.x or 0 e.y=e.y or 0 if self.content then e.x=(e.x<0 and 0)or(e.x>1 and 1)or e.x e.y=(e.y<0 and 0)or(e.y>1 and 1)or e.y self.content.scroll.x,self.content.scroll.y=e.x or self.content.scroll.x,e.y or self.content.scroll.y end return self else if self.content then return self.content.scroll end end end function tc.update(e,l,o)local t,r=tc.me,tc.elements local d,i,a,n=t.nothing,false,{},nil if type(e)=="table"
-	then o=l end if e then if tc.click and not o then tc.click=false d=t.noclick tc.draging_obj=nil elseif not tc.click and o then tc.click=true d=t.click tc.draging_obj=nil end for e=1,#r do ins(a,r[e])end sort(a,function(n,e)return n.z>e.z end)for r=1,#a do n=a[r]if n then if type(e)=="table"then if n:updateSelf{focused_element=e,press=o,event=(i or not n.activity)and t.none or d}then i=true end elseif e and l and type(e)~="table"then if n:updateSelf{mouse_x=e,mouse_y=l,press=o,event=((i or(tc.draging_obj and tc.draging_obj.obj~=n))or not n.activity)and t.none or d}then i=true end else error("Wrong arguments for update()")end end end for e=#r,1,-1 do if r[e]then r[e]:updateTrack()end end end end function tc.draw()local e={}for n=1,#tc.elements do if tc.elements[n].draw then ins(e,tc.elements[n])end end sort(e,function(n,e)return n.z<e.z end)for n=1,#e do e[n]:drawSelf()end end function tc:style(e)if self.type=="group"then for t,n in pairs(self.elements)do R(n,F(e),false)end else R(self,F(e),false)end return self end function tc:anchor(n)if self.type=="group"then for t,e in pairs(self.elements)do e:anchor(n)end else local e,t,r,o,i=self.drag.bounds,
-	nil,nil,nil,nil if e and e.x then t=e.x[1]-n.x r=e.x[2]-n.x elseif e and e.y then o=e.y[1]-n.y i=e.y[2]-n.y end self.track={ref=n,d={x=self.x-n.x,y=self.y-n.y},b={x={t,r},y={o,i}}}end return self end function tc:group(n,e)if e then n.elements[e]=self else ins(n.elements,self)end return self end function tc:active(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:active(e)end else self.activity=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:active()end return e else if self.activity~=nil then return self.activity end end end end function tc:visible(e)if e~=nil then if self.type=="group"then for t,n in pairs(self.elements)do n:visible(e)end else self.visibility=e end return self else if self.type=="group"then local e={}for n,t in pairs(self.elements)do e[n]=t:visible()end return e else if self.activity~=nil then return self.visibility end end end end function tc:dragBounds(e)if e~=nil then self.drag.bounds=e else return self.drag.bounds end end function tc:horizontalRange(n)local e=self.drag.bounds if n~=nil then self.x=e.x[1]+(e.x[2]-e.x[1])*n else assert(e and e.x and#e.x==2,
-	"X bounds error!")return(self.x-e.x[1])/(e.x[2]-e.x[1])end end function tc:verticalRange(n)local e=self.drag.bounds if n~=nil then self.y=e.y[1]+(e.y[2]-e.y[1])*n else assert(e and e.y and#e.y==2,"Y bounds error!")return(self.y-e.y[1])/(e.y[2]-e.y[1])end end function tc:index(e)if e~=nil then if self.type=="group"then local n for t,e in pairs(self.elements)do if not n or e.z<n then n=e.z end end for r,t in pairs(self.elements)do local e=t.z-n+e t:index(e)end else self.z=e if e>tc.hz then tc.hz=e end end else return self.z end return end function tc:toFront()if self.z<tc.hz or self.type=="group"then return self:index(tc.hz+1)end end function tc:remove()for e=#tc.elements,1,-1 do if tc.elements[e]==self then rem(tc.elements,e)self=nil end end end function tc.empty()for e=1,#tc.elements do tc.elements[e]=nil end end
+			function ui.add_addon(adn)ui._addons[#ui._addons+1]=adn end
 
-	-- (Skaruts) convenience functions (also helps keeping under 64k)
-	function tc.enable(t)
-		t:visible(true)
-		t:active(true)
-	end
-	function tc.disable(t)
-		t:visible(false)
-		t:active(false)
-	end
-	function tc.set_enabled(t, bool)
-		t:visible(bool)
-		t:active(bool)
-	end
---=--=--=--=--=--=--=--=--=--=--=--=--
+			function ui._push(it)ui._items[#ui._items+1]=it end
+			function ui._pop()ui._items[#ui._items]=nil end
+			function ui._peek()return ui._items[#ui._items]end
 
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       State stuff
+			function ui.show()ui.visible=true end
+			function ui.hide()ui.visible=false end
+			function ui.with_visible(b,f,...)
+				local prev,ret=ui.visible
+				ui.visible=b
+				ret=f(...)
+				ui.visible=prev
+				return ret
+			end
 
+			function ui.enable()ui.active=true end
+			function ui.disable()ui.active=false end
+			function ui.with_active(b,f,...)
+				local prev,ret=ui.active
+				ui.active=b
+				ret=f(...)
+				ui.active=prev
+				return ret
+			end
+
+			function ui.lock()ui.locked=true end
+			function ui.unlock()ui.locked=false end
+			function ui.with_locked(b,f,...)
+				local prev,ret=ui.locked
+				ui.locked=b
+				ret=f(...)
+				ui.locked=prev
+				return ret
+			end
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       Cache Stuff
+			-- item cache - ids (current frame), hovered ids and pressed ids (last frame)
+			function ui._cache_item(it)
+				-- if ID is claimed, widget is back alive, remove ID (see 'ui.end_frame()')
+				if ui._cache.i[it.id]then ui._cache.i[it.id]=nil end
+			end
+
+			function ui._is_cached_hovd(id)return ui._cache.h[id]~=nil end
+			function ui._is_cached_prsd(id)return ui._cache.p[id]~=nil end
+
+			function ui._cache_hovd(id)ui._cache.h[id]=true end
+			function ui._cache_prsd(id)ui._cache.p[id]=true end
+
+			function ui._uncache_hovd(id)ui._cache.h[id]=nil end
+			function ui._uncache_prsd(id)ui._cache.p[id]=nil end
+
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       Rendering Stuff
+			function ui.push_render_step(name,args)
+				ui._rend_steps[#ui._rend_steps+1]={name,args}
+			end
+
+			ui._rend_step_fns={
+				rect=rect,
+				rectb=rectb,
+				line=line,
+				print=print,
+				spr=spr,
+				clip=clip,
+			}
+
+			function ui.add_render_step(nm,rs,rsf)
+				ui[nm]=rs
+				ui._rend_step_fns[nm]=rsf
+			end
+
+			function ui.rect(...)ui.push_render_step("rect",{...})end
+			function ui.rectb(...)ui.push_render_step("rectb",{...})end
+			function ui.line(...)ui.push_render_step("line",{...})end
+			function ui.print(...)ui.push_render_step("print",{...})end
+			function ui.spr(...)ui.push_render_step("spr",{...})end
+			function ui.clip(...)
+				local b = {...}
+				ui._peek().bounds=b
+				ui.push_render_step("clip",b)
+			end
+
+			function ui.with_clip(x,y,w,h,f,...)
+				ui.clip(x,y,w,h)
+				f(...)
+				ui.clip()
+			end
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       Loop Stuff
+			function ui._run_addons(fname)
+				for _,addon in ipairs(ui._addons) do
+					local f=addon[fname]
+					if f then f(addon,it) end
+				end
+			end
+
+			ui._uchars,ui._chars=
+				'ABCDEFGHIJKLMNOPQRSTUVWXYZ=!"#$%&/()_ «»?|;:',
+				"abcdefghijklmnopqrstuvwxyz0123456789- <>\\'~`,.  "
+
+			function ui._input(event)
+				ui.shift=key(64)
+				ui.ctrl=key(63)
+				ui.alt=key(65)
+				-- ui.tab=keyp(49)
+
+				for i=1,62 do
+					if keyp(i, 25, 5) then
+						ui._key_entered=i
+
+						-- TODO: problem: TIC's keycodes are incomplete and
+						--       incompatible with foreign keyboards,
+						--       so receiving text input is limited
+						if i <= 48 then
+							ui._key_char=(ui.shift and ui._uchars:sub(i,i) or ui._chars:sub(i,i))
+						end
+					end
+				end
+				-- monitor("key: ", ui._key_entered)
+				-- monitor("char: ", ui._key_char)
+				ui._run_addons("input")
+			end
+
+			function ui.start_frame()
+				ui._input()
+
+				ui.mouse_on_ui=false
+				ui._timer.elapsed=ui._timer.elapsed+dt
+
+				if ui._timer.count then
+					ui._timer.t=ui._timer.t+dt
+					ui._timer.cooldown=ui._timer.cooldown-dt
+				end
+
+				if not ui._cache.h[ui.info_item.id]then
+					ui.info_item=_NIT
+				end
+
+				ui._run_addons("start_frame")
+			end
+
+			function ui._render()
+				if ui.visible then
+					local unpk,_rend_step_fns=unpk,ui._rend_step_fns
+					for _,v in ipairs(ui._rend_steps)do
+						_rend_step_fns[v[1]](unpk(v[2]))
+					end
+					ui._rend_steps={}
+				end
+			end
+
+			function ui.end_frame()
+				ui._run_addons("end_frame")
+
+				ui._render()
+
+				if m1 and(ui._curr.prsd==_NID or ui._curr.hovd==_NID)then
+					ui._kb_focus=_NID
+				end
+
+				if not m1 then
+					ui._curr.prsd=_NID
+					ui._prev.prsd=_NID
+				else
+					if ui._curr.prsd==_NID then
+						ui._curr.prsd=_NIT   -- this helps telling when mouse is down but no item is clicked
+					else
+						if ui._curr.prsd~=ui._kb_focus then
+							ui._kb_focus=_NID
+						end
+					end
+				end
+				-- -- if no widget grabbed tab, clear focus
+				if ui._key_entered==49 then -- TAB
+					ui._kb_focus=_NID
+				end
+				ui._key_entered=_NOK
+				ui._key_char=nil
+				ui._text_changed=false
+				if ui._curr.hovd==_NID then
+					ui._prev.hovd=_NID
+					if ui._curr.prsd==_NID and ui._kb_focus==_NID then
+						ui._it_state_changed=false
+					end
+				end
+
+				-- ---- HOUSEKEEPING -----------------------------------
+				-- IDs cached at this point are those that haven't been claimed
+				-- by any _items this frame in 'ui._new_item()'. That means
+				-- they're orfan IDs from innactive ui items (hidden, gone, etc)
+				-- and should be removed here.
+
+				-- clean up orfan IDs
+				for id,_ in pairs(ui._cache.i)do
+					if ui._cache.h[id]then ui._cache.h[id]=nil end
+					if ui._cache.p[id]then ui._cache.p[id]=nil end
+				end
+				-- gather what's left for next frame
+				ui._cache.i=dmerge(ui._cache.h,ui._cache.p)
+
+				------- HOUSEKEEPING DEBUG --------
+				-- local hk_str = ""
+				-- local lhi_str = ""
+				-- local lpi_str = ""
+				-- for k,_ in pairs(ui._cache.i) do hk_str = hk_str .. " | " .. tostring(k) end
+				-- for k,_ in pairs(ui._cache.h) do lhi_str = lhi_str .. " | " .. tostring(k) end
+				-- for k,_ in pairs(ui._cache.p) do lpi_str = lpi_str .. " | " .. tostring(k) end
+
+				-- monitor("ui._cache.i    ", hk_str, 22)
+				-- monitor("ui._cache.h  ", lhi_str, 22)
+				-- monitor("ui._cache.p  ", lpi_str, 22)
+			end
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--=--=--=--=--=--=--=--=--=--=--=--
+		--       Item Stuff
+			function ui._make_id(it)
+				if it.parent then return it.parent.id.."."..it.id end
+				return it.id
+			end
+
+			function ui.begin_item(id,x,y,w,h,op)
+				return ui._new_item(id,x,y,w,h,op)
+			end
+
+			function ui.end_item(it)
+				if it.hovered then it:_set_as_last_hovered(true)end
+				if it.pressed and it.hovered then it:_set_as_last_pressed(true)end
+				ui._pop()
+			end
+
+			function ui.with_item(id,x,y,w,h,op,f)
+				if ui.visible then
+					local t=ui.begin_item(id,x,y,w,h,op)
+						if ui.is_under_mouse(t.gx,t.gy,w,h) then
+							ui.mouse_on_ui=true
+						end
+						f(t, t.args and unpk(t.args) or nil)-- -1)
+					ui.end_item(t)
+					return t
+				end
+			end
+
+			function ui._set_none_hovered()ui._curr.hovd=_NID end
+			function ui._set_none_pressed()ui._curr.prsd=_NID end
+			function ui._is_none_pressed()return ui._curr.prsd==_NID end
+
+			local _IDX_LUT = {
+				-- global position
+				gx=function(t)return t.parent and t.parent.gx+t.x or t.x end,
+				gy=function(t)return t.parent and t.parent.gy+t.y or t.y end,
+			}
+			local Item={}
+			local _ITMT={
+				__index=function(t,k)
+					if Item[k]~=nil then return Item[k]end
+					return _IDX_LUT[k]and _IDX_LUT[k](t)
+						or nil
+				end,
+				__tostring=function(t) -- only for debugging
+					return fmt("%s(%s,%s,%s,%s,",t.id,t.gx,t.gy,t.w,t.h)
+						.. fmt("\n  hovered: %s",t.hovered)
+						-- .. fmt("\n  m_enter: %s", t.mouse_entered)
+						-- .. fmt("\n  m_exit:  %s", t.mouse_exited)
+						-- .. fmt("\n  held:    %s", t.held)
+						-- .. fmt("\n  pressed: %s", t.pressed)
+						-- .. fmt("\n  release: %s", t.released)
+						.. "\n)"
+				end,
+			}
+			function ui._new_item(id,x,y,w,h,op)
+				op=op or {}
+				local t=setmt({id=id,x=x,y=y,w=w,h=h},_ITMT)
+
+				if #ui._items>0 then t.parent=ui._peek()end
+				ui._push(t)
+				t.id=ui._make_id(t)
+
+				if ui.active then
+					t.hovered=ui._is_cached_hovd(t.id)
+					t.held=ui._is_cached_prsd(t.id)
+				end
+				ui._cache_item(t)
+
+				if type(op)=="function"then op={code=op}end
+				for k,v in pairs(op)do
+					t[k]=v
+				end
+				return t
+			end
+
+			function ui.is_under_mouse(x,y,w,h)
+				return mx>=x and mx<x+w
+				   and my>=y and my<y+h
+			end
+
+			function ui.has_kb_focus(id)
+				return ui._kb_focus==id
+			end
+
+			function Item._set_as_last_hovered(t,enable)
+				if enable then
+					ui._prev.hovd=t.id
+					if not ui._is_cached_hovd(t.id)then
+						ui._cache_hovd(t.id)
+					end
+				else
+					ui._uncache_hovd(t.id)
+				end
+			end
+
+			function Item._set_as_last_pressed(t,enable)
+				if enable then
+					ui._prev.prsd=t.id
+					if not ui._is_cached_prsd(t.id) then
+						ui._cache_prsd(t.id)
+					end
+				else
+					ui._uncache_prsd(t.id)
+				end
+			end
+
+			function Item._is_last_hovered(t)
+				return ui._prev.hovd==t.id
+					or ui._is_cached_hovd(t.id)
+			end
+
+			function Item._is_last_pressed(t)
+				return ui._prev.prsd==t.id
+					or ui._is_cached_prsd(t.id)
+			end
+
+			function Item.check_hovered(t,x,y,w,h)
+				if not ui.locked and ui.active then
+					if ui.is_under_mouse(x,y,w,h)then
+						if not t.hovered and (ui._is_none_pressed() or t.held) then
+							t.hovered=true
+							ui._curr.hovd=t.id
+						end
+						if t.hovered then
+							if not t:_is_last_hovered() then
+								t.mouse_entered=true
+								if t.tip then ui.info_item=t end
+							end
+							return true
+						end
+					else
+						t.hovered=false
+						if ui._curr.hovd==t.id then
+							ui._set_none_hovered()
+						end
+						if t:_is_last_hovered()or t:_is_last_pressed()then
+							t.mouse_exited=true
+							t:_set_as_last_hovered(false)
+						end
+					end
+				else
+					t.hovered = false
+					t:_set_as_last_hovered(false)
+				end
+				return false
+			end
+
+			function Item.check_pressed(t)
+				if not ui.locked and ui.active then
+					if m1 then
+						if t.held then return true end
+						if t.hovered and ui._is_none_pressed()then -- and not t.held then
+							ui._curr.prsd=t.id
+							if not t:_is_last_pressed() then
+								t.pressed=true
+							else
+								t.held=true
+							end
+							return true
+						end
+					else
+						if t.held then
+							if ui._curr.prsd==t.id then
+								ui._set_none_pressed()end
+							t.held=false
+							if t:_is_last_pressed()then
+								t:_set_as_last_pressed(false)
+								if t.hovered then
+									t.released=true
+								end
+							end
+						end
+					end
+				else
+					t.pressed = false
+					t.held = false
+					t:_set_as_last_pressed(false)
+				end
+				return false
+			end
+		--=--=--=--=--=--=--=--=--=--=--=--
+
+	--[[ TICkle Extensions                      006 ]]
+		--[[ print with shadow rendering            001 ]]
+			ui.add_render_step("prints",
+				function(...)ui.push_render_step("prints",{...})end,
+				prints
+			)
+		--[[ nframe rendering                       002 ]]
+			local function _draw_quad(x,y,w,h,u,v,u2,v2)
+				textri(x, y,   x+w,  y,    x+w, y+h,   u, v,   u2, v,    u2, v2)
+				textri(x, y,   x+w, y+h,   x,   y+h,   u, v,   u2, v2,    u, v2)
+			end
+			ui.add_render_step("nframe",
+				function(...)ui.push_render_step("nframe",{...})end,
+				function(x,y,w,h,i,bw,s)
+					i,bw,s=i or 0,bw or 3,s or 1
+
+					local x2,x3,y2,y3=x+bw,x+w-bw,y+bw,y+h-bw
+					local cw,ch=x3-x2,y3-y2  -- center w/h
+
+					local UVS=8*s -- uv size
+
+					local u,v=i%16*8,i//16*8
+					local u4,v4=u+UVS,v+UVS
+					local u2,v2,u3,v3=u+bw,v+bw,u4-bw,v4-bw
+
+					--          x   y      w   h      u1  v1     u2  v2
+					_draw_quad( x,  y,     bw, bw,    u,  v,     u2, v2 )  -- top left
+					_draw_quad( x3, y,     bw, bw,    u3, v,     u4, v2 )  -- top right
+					_draw_quad( x,  y3,    bw, bw,    u,  v3,    u2, v4 )  -- bottom left
+					_draw_quad( x3, y3,    bw, bw,    u3, v3,    u4, v4 )  -- bottom right
+
+					_draw_quad( x,  y2,    bw, ch,    u,  v2,    u2, v3 )  -- left
+					_draw_quad( x3, y2,    bw, ch,    u3, v2,    u4, v3 )  -- right
+
+					_draw_quad( x2, y,     cw, bw,    u2, v,     u3, v2 )  -- top
+					_draw_quad( x2, y3,    cw, bw,    u2, v3,    u3, v4 )  -- bottom
+
+					_draw_quad( x2, y2,    cw, ch,    u2, v2,    u3, v3 )  -- center
+				end
+			)
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
 	-- in-game persistent options / load values or defaults
-	local draw_d_cells, wrap_around, use_padding, rand_start, rand_reset, zoom_lvl =1,2,3,4,5,6
-	local opts={false, true, true, true, false, 4}
-	if pmem(draw_d_cells) ~= 0 then opts[draw_d_cells] = true end
-	if pmem(wrap_around)  ~= 1 then opts[wrap_around]  = false end
-	if pmem(use_padding)  ~= 1 then opts[use_padding]  = false end
-	if pmem(rand_start)   ~= 1 then opts[rand_start]   = false end
-	if pmem(rand_reset)   ~= 0 then opts[rand_reset]   = true end
+	local webv,opts=false,{true,true,true,false,1}
+	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,CC_R,CC_G,CC_B=1,2,3,4,5,6,7,8
 
-	local mem_zoom = pmem(zoom_lvl)
-	if mem_zoom == 0 then pmem(zoom_lvl, 4)
-	elseif mem_zoom ~= 4 then opts[zoom_lvl] = mem_zoom
+	-- original cell color = da7100 | 218,113,0
+	local PALM=0x03FC0
+	local cell_col=webv and {peek(PALM+8*3),peek(PALM+8*3+1),peek(PALM+8*3+2)} or nil
+	function set_cell_color(c)
+		cell_col=c
+		local i,r,g,b=PALM+8*3,unpk(c)
+		poke(i  ,r)
+		poke(i+1,g)
+		poke(i+2,b)
+
+		pmem(CC_R,r)
+		pmem(CC_G,g)
+		pmem(CC_B,b)
+	end
+
+
+	if not webv then
+		if pmem(USE_PADDING) ~= 1 then opts[USE_PADDING] = false end
+		if pmem(WRAP_AROUND) ~= 1 then opts[WRAP_AROUND] = false end
+		if pmem(RAND_START)  ~= 1 then opts[RAND_START]  = false end
+		if pmem(RAND_RESET)  ~= 0 then opts[RAND_RESET]  = true end
+		if pmem(ZOOM_LVL)==0 then pmem(ZOOM_LVL, opts[ZOOM_LVL]) end
+
+		local mr,mg,mb=pmem(CC_R),pmem(CC_G),pmem(CC_B)
+		-- tracec(mr,mg,mb)
+		-- if mr~=r or mg~=g or mb~=b then
+			set_cell_color({mr,mg,mb})
+		-- end
+		-- trace1d(cell_col)
 	end
 
 	function toggle_opt(i) -- toggle value of an option and save it
 		local b=not opts[i]
-		pmem(i,b and 1or 0)
+		pmem(i,b and 1 or 0)
 		opts[i]=b
+		if i == USE_PADDING then
+			set_padding(b)
+		end
 	end
+	local upd_delay=0
+	local g_mx,g_my,g_lmx,g_lmy=0,0,0,0 -- grid mouse pos
+	local ctrl,shift,alt=false,false,false
 
-	local g_mx,g_my=0,0 -- grid mouse pos
-	local ct_mod,sh_mod,al_mod,mouse_on_ui=false,false,false,false
-	local cols={
-		bg=0,
-		text=5,
-		header=9,
-		dead=2,
-		alive=8,
-		selected=11,
-		erasing=7,
-		ui_lines=13,
-		dim_text=14,
-		paused=7,
-	}
 	local pre,cur,sel=1,2,3 -- prev/curr/ghost buffer indices
 	local cells={} -- cell buffers
-	local SS,NSW,NSH=8,30,17 -- sprite size, num sprites wide / high
-	local CS,GW,GH=SS//opts[zoom_lvl],NSW*opts[zoom_lvl],NSH*opts[zoom_lvl] -- cell size, grid width/height
-	local pad=0 -- padding for cell rects (always 0 if 'opts[zoom_lvl] < 8' -- see 'set_padding()')
-	local anim,ui_vis=nil,true
-	local paused,stopped,eraser,t_old=true,true,false,0
-	local bar_outline,bar_bg=000,002 -- tiles
-	local use_topbar,use_ibar=false,false -- starting state is inverted for these
+	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
+	local zoom_mults={8,4,2,1}
+	local pad,anim=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
+	local paused,stopped,eraser,trippy=true,true,false,false
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
 	local GAME_SCR,HELP_SCR1,HELP_SCR2,HELP_SCR3,HELP_SCR4,OPTS_SCR=1,2,3,4,5,10 -- game screens
-	local num_help_scrs,cur_scr=4,GAME_SCR
+	local NUM_HELP_SCRS,cur_scr=4,GAME_SCR
+
+	-- http://www.mirekw.com/ca/ca_files_formats.html
+
+	-- local STATICS,OSCILATORS,EXPLOSIVE,GLIDERS,GUNS=1,2,3,4,5
+	local cats={
+		"Statics",
+		"Oscilators",
+		"Amusing/Explosive",
+		"Gliders",
+		"Guns",
+	}
 
 	-- help strings
 	--------------------------
 	local help_strs={
-		hstr1=[[
+		[[
 
-				                1 Speed meter
+		                1 Speed meter
 
-				  1  2     3    2 Generation count
+		  1  2     3    2 Generation count
 
-				                3 Alive|Dead/Total cells
-				 4
-				                4 Playback controls
-				 5
-				                5 Drawing tools
+		                3 Alive|Dead/Total cells
+		 4
+		                4 Playback controls
+		 5
+		                5 Drawing tools
 
-				                6 Zoom lvl/mouse pos
-				   6   7    8
-				                7 Tool tips
+		                6 Zoom lvl/mouse pos
+		   6   7    8
+		                7 Tool tips
 
-				                8 Options/Help
-				]],
-		hstr2=[[
-					H         Cycle help screens
-					O         Toggle Options
-					SPACE     Pause/play
-					SHIFT-SPC Reset (stop)
-					SHIFT-C/F Revive/kill all cells
-					ENTER     Randomize cells
-					K         Draw dead cells
-					G         Next Generation (if paused)
-					I/T       Toggle UI bars
-					TAB/U     Toggle/Reset UI
-					PG-UP/DN  Zoom in/out (resets cells)
-					P         Toggle padding (if zoom<4)
-				]],
-		hstr3=[[
-					LMB       Draw
-					RMB       Erase(brush tool)/cancel
-					MMB       Erase(non-brush tools)
-				]],
-		hstr4=[[
-					V/1       Brush tool
-					2-6       Pattern tool/categories
-					L         Line tool
-					R/C       Rectangle/circle tools
-					F         Fill tool
-				]],
-		hstr5=[[
-					E         Toggle eraser mode
-					CTRL      Filled rect/circle
-					SHIFT     Proportional rect/circle
-					ALT       Centered rect/circle
-					W         Expand brush/next pattern
-					S         Shrink brush/prev pattern
-				]],
-		hstr6=[[
-					2 - Static
-					3 - Blinkers
-					4 - Amusing/Explosive
-					5 - Gliders
-					6 - Glider Gun!
-
-
-
-
-
-
-
-
-
-					Lol Note: The Glider Gun doesn't fit
-					  on the screen with zoom level 1
-				]]
+		                8 Options/Help
+		]],
+		[[
+			H         Cycle help screens
+			O         Toggle Options
+			SPACE     Pause/play
+			  +SHIFT  Reset (stop)
+			ENTER     Randomize cells
+			SHIFT-C/F Revive/kill all cells
+			G         Next Generation (if paused)
+			I         Toggle info
+			TAB       Toggle UI
+			PG-UP/DN  Zoom in/out (resets cells)
+			P         Toggle padding (if zoom>2)
+		]],
+		[[
+			LMB       Start Drawing/Commit Draw
+			RMB       Erase(brush tool)/cancel
+			MMB       Erase(non-brush tools)
+		]],
+		[[
+			V/1       Brush tool
+			2-6       Pattern tool/categories
+			L         Line tool
+			R/C       Rectangle/circle tools
+			F         Fill tool
+		]],
+		[[
+			E         Toggle eraser mode
+			SHIFT     Proportional rect/circle
+			CTRL      Filled rect/circle
+			ALT       Centered rect/circle
+			W         Expand brush/next pattern
+			S         Shrink brush/prev pattern
+		]],
+		[[
+			2         Statics
+			3         Oscilators
+			4         Amusing/Explosive
+			5         Gliders
+			6         Guns
+		]]
 	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
 -- fwd decls
-local tl,ui,rand_cells
+local tl,rand_cells
+
+--=--=--=--=--=--=--=--=--=--=--=--=--
+-- GUI
+	local pb_rect={x=240//2-76//2,y=-2,            w=76,h=10}
+	local tb_rect={x=-2,          y=136//2-80//2,  w=10,h=80}
+	local thm={
+		bg=0,
+		fg=13,
+		text=5,
+		shad=3,
+		outl=1,
+		header=9,
+		cell=8,
+		select=11,
+		erase=7,
+		dim_text=14,
+		btn={
+			fg_n=3,bg_n=0,
+			fg_h=4,bg_h=0,
+			fg_p=5,bg_p=0,
+		},
+	}
+
+	local info_vis=true
+	function toggle_info()
+		info_vis=not info_vis
+	end
+
+	function _btn_icon(t,icn)
+		if not ui.active then return icn+3 end
+		if t.hovered then
+			if t.held then return icn+2 end
+			return icn+1
+		end
+		return icn
+	end
+
+	-- function _btn_col(t)
+	-- 	local b=thm.btn
+	-- 	if t.hovered then
+	-- 		if t.held then return b.fg_p,b.bg_p end
+	-- 		return b.fg_h,b.bg_h
+	-- 	end
+	-- 	return b.fg_n,b.bg_n
+	-- end
+
+	function Label(id,x,y,tx,c,op) -- align, op)
+		c=c or thm.text
+		ui.with_item(id,x,y,0,0,op,function(t)
+			if t.shadow then ui.prints(tx,t.gx,t.gy,c,thm.shad)
+			else ui.print(tx,t.gx,t.gy,c)
+			end
+		end)
+	end
+
+	function Button(id,x,y,icn,op)
+		return ui.with_item(id,x,y,8,8,op,function(t,...)
+			t:check_hovered(t.gx,t.gy,t.w,t.h)
+			t:check_pressed()
+			if t.code then t:code(...)end
+			ui.spr(_btn_icon(t,icn),t.gx,t.gy,0)
+		end)
+	end
+
+	-- local function TButton(id,x,y,txt,op)
+	-- 	local w=txtw(txt)+2
+	-- 	return ui.with_item(id,x,y,w,8,op,function(t,...)
+	-- 		t:check_hovered(t.gx,t.gy,w,t.h)
+	-- 		t:check_pressed()
+	-- 		if t.code then t:code(...)end
+	-- 		if t.shadow then ui.prints(txt,t.gx,t.gy+2,_btn_col(t),t.shadow)
+	-- 		else
+	-- 			ui.print(txt,t.gx,t.gy+2,_btn_col(t),false,1,false)
+	-- 		end
+	-- 	end)
+	-- end
+
+	function GenInfo()
+		-- ui.with_item("gi",x,y,w,h,nil,function(t)
+		if ui.visible then
+			local ty,tc,oc,cstr,tcstr,tstr=2,thm.text,thm.outl,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
+			printo("Gen: "..gens,2,ty,tc,oc,_,_,true)
+
+			printo("C:"..rep(' ',6-#cstr)..cstr
+			     .."|"..rep(' ',6-#tcstr)..tcstr
+			     .."/"..rep(' ',6-#tstr)..tstr
+				,2,ty+8,tc,oc,false,_,true)
+
+			-- printo("Speed:"..(100-upd_delay),2,ty+16,tc,oc,_,_,true)
+			printo("Speed:"..1-(1*(upd_delay/100)),2,ty+16,tc,oc,_,_,true)
+		end
+	end
+
+	function Separator(x,y)
+		ui.with_item("-",x,y,0,0,_,function(t)
+			ui.spr(5,t.gx,t.gy,0)
+		end)
+	end
+
+	function PlaybackBar(id,r,op)
+		ui.with_item("pb",r.x,r.y,r.w,r.h,op,function(t)
+			ui.nframe(r.x,r.y,r.w,r.h,3)
+			local b1,b2,b3,b4,b5,b6,b7,b8,b9
+
+			b1=Button("b_rand",2,1,16)
+			b2=Button("b_zoom",10,1,19)
+			Separator(15,1)
+			b3=ui.with_active(upd_delay<100,Button,"b_back",22,1,32)
+			b4=Button("b_stop",30,1,stopped and 67 or 64)
+
+			if stopped then
+				b5=Button("b_play",38,1,80)
+				if b5.released then unpause()end
+			elseif paused then
+				b5=Button("b_play",38,1,83)
+				if b5.released then unpause()end
+			else
+				b6=Button("b_pause",38,1,96)
+				if b6.released then pause()end
+			end
+
+			b7=ui.with_active(upd_delay>0,Button,"b_fwd",46,1,48)
+
+			Separator(52,1)
+			b8=Button("b_opts",59,1,240)
+			b9=Button("b_help",67,1,243)
+
+			if b1.released then rand_cells()end
+			if b2.released then inc_zoom()end
+			if b4.released then pause(true)end
+
+			if shift then
+				if b3.held then dec_speed()end
+				if b7.held then inc_speed()end
+			else
+				if b3.released then dec_speed()end
+				if b7.released then inc_speed()end
+			end
+
+			if b8.released then toggle_options()end
+			if b9.released then toggle_help()end
+		end)
+	end
+
+	function Toolbar(id,r,op)
+		ui.with_item("tb",r.x,r.y,r.w,r.h,op,function(t)
+			ui.nframe(r.x,r.y,r.w,r.h,3)
+			local ttp,b1,b2,b3,b4,b5,b6=tl.type
+			b1=Button("b_brush",1,1, 112+(ttp~="brush"and 0 or(eraser and 4 or 2)))
+			b2=Button("b_rect", 1,9, 128+(ttp~="rect"and 0 or(eraser and 4 or 2)))
+			b3=Button("b_circ", 1,17,144+(ttp~="circle"and 0 or(eraser and 4 or 2)))
+			b4=Button("b_line", 1,25,160+(ttp~="line"and 0 or(eraser and 4 or 2)))
+			b5=Button("b_fill", 1,33,176+(ttp~="fill"and 0 or(eraser and 4 or 2)))
+			b6=Button("b_patt", 1,41,192+(ttp~="pattern"and 0 or(eraser and 4 or 2)))
+			if b1.released then tl:switch("brush")end
+			if b2.released then tl:switch("rect")end
+			if b3.released then tl:switch("circle")end
+			if b4.released then tl:switch("line")end
+			if b5.released then tl:switch("fill")end
+			if b6.released then tl:switch("pattern")end
+
+			ui.spr(4,t.gx+1,t.gy+49,0)
+
+			if tl.type=="rect"then
+				ui.spr(shift and 119 or 118,t.gx+1,t.gy+56,0)
+				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+63,0)
+				ui.spr(alt and 151 or 150,t.gx+1,t.gy+70,0)
+			elseif tl.type=="circle"then
+				ui.spr(shift and 167 or 166,t.gx+1,t.gy+56,0)
+				ui.spr(ctrl and 183 or 182,t.gx+1,t.gy+63,0)
+				ui.spr(alt and 199 or 198,t.gx+1,t.gy+70,0)
+			end
+		end)
+	end
+
+	function Spinbox(id,x,y,val,min,max,step,op)
+		return ui.with_item(id,x,y,8,8,op,function(t,...)
+			t.val=val
+			local b1,b2=
+				Button("b1",0,0,224),
+				Button("b2",txtw(tostr(max))+10,0,227)
+			if b1.pressed then val=wrap(val-step,min,max)end
+			if b2.pressed then val=wrap(val+step,min,max)end
+			if t.val~=val then
+				if val<t.val then t.decreased=true
+				elseif val>t.val then t.increased=true
+				end
+				t.val_changed=true
+				t.val=val
+			end
+			if t.code then t:code(...)end
+			Label("l1",9,1,tostr(t.val),14)
+		end)
+	end
+
+	function Switch(id,x,y,is_on,op)
+		local w,h=16,8
+		return ui.with_item(id,x,y,w,h,op,function(t,...)
+			t:check_hovered(t.gx,t.gy,w,h)
+			t:check_pressed()
+
+			if t.pressed then
+				is_on=not is_on
+				t.switched=true
+			end
+			t.is_on=is_on
+
+			if t.code then t:code(...)end
+
+			local handle=t.hovered and(is_on and 248 or 246)
+				                    or(is_on and 232 or 230)
+
+			ui.spr(handle,t.gx,t.gy,-1,1,0,0,2,1)
+		end)
+	end
+
+	-- function ColorBar(id,x,y,val)
+	-- 	local w=10*8,8
+	-- 	ui.with_item(id,x,y,w,h,_,function(t, ...)
+	-- 		Button("lb",0,0,214)
+	-- 		Button("rb",72,0,230)
+	-- 		for i=0,7 do
+	-- 			-- 217
+	-- 			-- 233
+	-- 			ui.spr(217,t.gx+8*(i+1),t.gy,0)
+	-- 		end
+	-- 		local hx=t.gx+6+(val//8)
+	-- 		trace(hx)
+	-- 		ui.spr(218,hx,t.gy,0)
+	-- 	end)
+	-- 	return val
+	-- end
+
+	function CellColorPicker(id,x,y,c)
+		local w,h,r,g,b=80,24,unpk(c)
+		ui.with_item(id,x,y,w,h,_,function(t, ...)
+			Label("l4",24,1,"Cell Color",thm.txt,{shadow=1})
+			ui.spr(1,t.gx+88,t.gy)
+			local s1,s2,s3
+
+			-- cell_col[1]=ColorBar("br1",8,8,cell_col[1])
+			s1=Spinbox("sb1",8, 8,r,0,255,1)
+			s2=Spinbox("sb2",8,16,g,0,255,1)
+			s3=Spinbox("sb3",8,24,b,0,255,1)
+			if s1.val_changed then r=s1.val end
+			if s2.val_changed then g=s2.val end
+			if s3.val_changed then b=s3.val end
+		end)
+		return {r,g,b}
+	end
+--=--=--=--=--=--=--=--=--=--=--=--=--
+
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Animation Player
@@ -412,408 +1284,22 @@ local tl,ui,rand_cells
 
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
--- UI helpers
-	local _cur_grp,_cur_anch
-
-	function group(g)_cur_grp=g end
-	function anchor(a)_cur_anch=a end
-
-	function _chk_grp_ancr(e)
-		if _cur_grp then e:group(_cur_grp)end
-		if _cur_anch then e:anchor(_cur_anch)end
-		return e
-	end
-
-	function _icon(i1,i2,i3,kc,sc,w,h)
-		return {sprites={i1,i2,i3},key=kc or 0,scale=sc or 1,w=w or 1,h=h or 1}
-	end
-
-	function _text(tx,c1,c2,c3,ax,ay,fix,ofx,ofy,s1,s2,s3)
-		return {print=tx,colors={c1,c2,c3},align={x=ax or 0,y=ay or 0},
-			fixed=fix or false,offset={x=ofx or 0, y=ofy or 0},
-			shadow={colors={s1 or 3,s2 or 3,s3 or 3}}}
-	end
-
-	function UIGroup()
-		return _chk_grp_ancr(tc.Group())
-	end
-
-	function UIElem(x,y,w,h)
-		return _chk_grp_ancr(tc.element({
-			x=x,y=y,w=w,h=h,
-			set_pos=function(t,x,y)t.x,t.y=x,y end,
-			set_size=function(t,w,h)t.w,t.h=w,h end
-		}))
-	end
-
-	function Label(x,y,tx,c,ax,ay,fix)
-		local e=UIElem(x,y,0,0)
-		e.text = _text(tx,c,c,c,ax,ay)
-		e.set_text=function(t,tx)t.text.print=tx end
-		return e
-	end
-
-	function TxtBtn(x,y,tx,fn,args)
-		local e=UIElem(SS*x,SS*y,print(tx,0,-99)+2,8)
-		e.text=_text(tx,9,6,6,1,1,false,1,1)
-		e.onCleanRelease=function(t)if fn then fn(args and unpk(args)or nil)end end
-		return e
-	end
-
-	function BaseBtn(x,y,w,h,i,nfo)
-		local e=UIElem(x,y,w,h)
-		if i then e.icon=_icon(i,i+1,i+2)end
-		if nfo then e.onHover=function(t)set_tooltip(nfo)end end
-		return e
-	end
-
-	function TlBarHandle(i,x,y,nfo)
-		local e=UIElem(x,y,SS*2,SS)
-		e.ox,e.oy=x,y
-		e.cooldown=0.5
-		e.click_t=0
-		e.count_t=false
-		e.icon=_icon(i,i,i,0,1,2,1)
-		e.drag={active=false,bounds={x={0,240-8},y={0,136-8}}}
-		e.onHover=function(t)set_tooltip(nfo)end
-		e.onPress=function(t)t.drag.active=true end
-		e.onCleanRelease=function(t)t.drag.active=false end
-		e.onClick=function(t)
-			if not t.count_t then
-				t:start_t()
-			else
-				local t1=time()/1000 -- TODO: redundant division?
-				local diff=abs(t.click_t-t1)
-				if diff<t.cooldown then
-					t:reset()
-				else
-					t:start_t()
-				end
-			end
-		end
-		e.start_t=function(t)t.click_t,t.count_t=time()/1000,true end
-		e.set_origin=function(t,x,y)
-			t.ox,t.oy=x,y
-			t:set_pos(x,y)
-		end
-		e.reset=function(t)
-			t:set_pos(t.ox,t.oy)
-			t.count_t,t.click_t=false,0
-		end
-		return e
-	end
-
-	function TLModeIcon(x,y,i,nfo)
-		local e=BaseBtn(x*SS,y*SS,SS,SS,nil,nfo)
-		e.set_state=function(t,bool)
-			t.icon=bool and _icon(i+1,i+1,i+1)or _icon(i,i,i)
-		end
-		return e
-	end
-
-	function Sep(i,x,y,w,h)
-		local e=UIElem(x,y,0,0)
-		e.icon=_icon(i,i+1,i+2,0,1,w,h)
-		return e
-	end
-
-	function Btn(x,y,i,nfo,fn,args)
-		local e=BaseBtn(x,y,SS,SS,i,nfo)
-		e.onCleanRelease=function(t)t:toggle_state()end
-		e.toggle_state=function(t)t:hit()end
-		e.hit=function(t)
-			if fn then fn(args and unpk(args)or nil)end
-		end
-		return e
-	end
-
-	function ToggleBtn(x,y,i,nfo,par,act_on,fn,args)
-		local e=Btn(x,y,i,nfo,fn,args)
-		e.icon1=_icon(i,i+1,i+2)
-		e.icon2=_icon(i+3,i+4,i+5)
-		e.is_on=false
-		e.act_on=act_on
-		e.parent=par
-		e.toggle_state=function(t)
-			if t.act_on=="sticky"then
-				if not t.is_on then
-					t.is_on=true
-					if t.parent then t.parent:reset_tls()end
-					t.icon=t.icon2
-				end
-				t:hit()
-			else
-				t.is_on=not t.is_on
-				if t.is_on then
-					if t.parent then t.parent:reset_tls()end
-					t.icon=t.icon2
-					if t.act_on=="on"or t.act_on=="toggle"then t:hit()end
-				else
-					if t.parent then t.parent:reset_tls()end
-					t.icon=t.icon1
-					if t.act_on=="off"or t.act_on=="toggle"then t:hit()end
-				end
-			end
-		end
-		e.turn_off=function(t)t.icon,t.is_on=t.icon1,false end
-		e.turn_on=function(t)t.icon,t.is_on=t.icon2,true end
-		return e
-	end
-
-
-	local cb_i = 208
-	function CheckBox(x,y,tx,is_on,fn,args)
-		Label(x+SS*2,y+1,tx,cols.text)
-
-		local e=Btn(x,y,cb_i,nil,fn,args)
-		e.icon1=_icon(cb_i,cb_i+1,cb_i+2)
-		e.icon2=_icon(cb_i+3,cb_i+4,cb_i+5)
-		e.icon=is_on and e.icon2 or e.icon1
-		e.toggle_state=function(t)
-			is_on=not is_on
-			t:hit()
-			t.icon=is_on and t.icon2 or t.icon1
-		end
-		e.turn_off=function(t)t.icon=t.icon1 end
-		e.turn_on=function(t)t.icon=t.icon2 end
-		return e
-	end
-
-	function UIPanel(bg_i,brdr_i,x,y,w,h,kc)
-		local e=UIElem(x,y,w,h)
-		e.tiled={sprites={bg_i,bg_i,bg_i},scale=1,key=kc or -1}
-		e.border={sprites={{brdr_i,brdr_i+1},{brdr_i,brdr_i+1},{brdr_i,brdr_i+1}},key=0,width=1}
-		return e
-	end
-
-	function ToolBtn(x,y,i,nm,k,par,fn,args)
-		local e=Btn(x*SS,y*SS,i,nm.." Tool "..k,fn,args)
-		e.icons={_icon(i,i+1),_icon(i+2,i+3),_icon(i+4,i+5)}
-		e.is_on=false
-		e.parent=par
-		e.onClick,e.onCleanRelease=e.onCleanRelease,nil -- swap
-		e.toggle_state=function(t)
-			t.is_on=not t.is_on
-			if t.is_on then
-				t.parent:reset_tls()
-				t.icon=t.icons[eraser and 3or 2]
-				t:hit()
-			else
-				t.icon=t.icons[1]
-			end
-		end
-		e.turn_off=function(t)
-			t.is_on=false
-			t.icon=t.icons[1]
-		end
-		e.turn_on=function(t)
-			t.is_on=true
-			t.icon=t.icons[eraser and 3or 2]
-		end
-		return e
-	end
-
-	function Toolbar(i,x,y,w,h)
-		local e=UIPanel(i+2,i,x-1,y-1,w+2,h+2)
-		e.tls={}
-		e.set_pos=function(t,x,y)t.x,t.y=x-1,y-1 end -- override
-		e.reset_tls=function(t)for _,b in pairs(t.tls)do b:turn_off()end end
-		return e
-	end
---=--=--=--=--=--=--=--=--=--=--=--=--
-
-
---=--=--=--=--=--=--=--=--=--=--=--=--
--- UI init
-	ui={
-		grp_ui,grp_tlbar,grp_ibar,grp_tbar,grp_rect,grp_circ,grp_play_btn,grp_pause_btn,grp_opts,
-		ui_bg,tlbar,ibar,tbar,tlbar_handle,
-		lbl_spd,lbl_gens,lbl_cells1,lbl_cells2,lbl_cells3,lbl_cells4,lbl_nfo,lbl_help,lbl_mouse,
-		btn_rand,btn_decel,btn_accel,btn_stop,btn_play,btn_pause,btn_help,btn_opts,btn_opts_out,
-		icn_r_sqr,icn_r_fill,icn_r_cntr,icn_c_sqr,icn_c_fill,icn_c_cntr,
-		cbx_pad,
-	}
-
-	function init_tlbar()
-		group(ui.grp_ui)
-			ui.grp_tlbar=UIGroup()
-
-		group(ui.grp_tlbar)
-			ui.tlbar_handle=TlBarHandle(006,0,0,"Drag me! (U/2xM1 to reset)")
-
-			ui.grp_play_btn=UIGroup()
-			ui.grp_pause_btn=UIGroup()
-
-			anchor(ui.tlbar_handle)
-				ui.tlbar=Toolbar(bar_outline,0,0,SS*2,SS*11)
-
-				ui.btn_rand=Btn(0,SS,016,"Randomize cells",rand_cells)
-				ui.btn_zoom=Btn(SS,SS,019,"Cycle zoom levels",function()set_zoom(1, true)end)
-				ui.btn_decel=Btn(0,SS*2,032,"Speed -- (N/A yet)",set_speed(-1))
-				ui.btn_accel=Btn(SS,SS*2,048,"Speed ++ (N/A yet)",set_speed(1))
-				ui.btn_stop=ToggleBtn(0,SS*3,064,"Stop/clear",nil,"sticky",pause, {true})
-				ui.btn_play=ToggleBtn(SS,SS*3,080,"Play/Pause/Unpause",nil,"toggle",unpause)
-				ui.btn_pause=ToggleBtn(SS,SS*3,096,"Play/Pause/Unpause",nil,"toggle",pause)
-
-				ui.tlbar.tls["brush"]=ToolBtn(0,5,112,"Brush","(V/1)",ui.tlbar,tl.switch,{"brush"})
-				ui.tlbar.tls["line"]=ToolBtn(1,5,160,"Line","(L)",ui.tlbar,tl.switch,{"line"})
-				ui.tlbar.tls["rect"]=ToolBtn(0,6,128,"Rectangle","(R)",ui.tlbar,tl.switch,{"rect"})
-				ui.tlbar.tls["circle"]=ToolBtn(1,6,144,"Circle","(C)",ui.tlbar,tl.switch,{"circle"})
-				ui.tlbar.tls["fill"]=ToolBtn(0,7,176,"Fill","(F)",ui.tlbar,tl.switch,{"fill"})
-				ui.tlbar.tls["pattern"]=ToolBtn(1,7,192,"Pattern","(2-6)",ui.tlbar,tl.switch,{"pattern"})
-				Sep(022,0,SS*4,2,1)
-				Sep(022,0,SS*8,2,1)
-			anchor()
-			ui.grp_rect=UIGroup()
-			ui.grp_circ=UIGroup()
-		group()
-
-		anchor(ui.tlbar_handle)
-			group(ui.grp_rect)
-				ui.icn_r_sqr=TLModeIcon(0,9,070,"Proportional (shift)")
-				ui.icn_r_fill=TLModeIcon(1,9,086,"Filled (ctrl)" )
-				ui.icn_r_cntr=TLModeIcon(0,10,102,"Centered (alt)")
-
-			group(ui.grp_circ)
-				ui.icn_c_sqr=TLModeIcon(0,9,118,"Proportional (shift)")
-				ui.icn_c_fill=TLModeIcon(1,9,134,"Filled (ctrl)" )
-				ui.icn_c_cntr=TLModeIcon(0,10,150,"Centered (alt)")
-			group()
-		anchor()
-
-		ui.grp_rect:disable()
-		ui.grp_circ:disable()
-
-		ui.tlbar_handle.set_origin(ui.tlbar_handle,0,26)
-		ui.tlbar_handle:toFront()
-		ui.btn_pause:disable()
-		anim:add_anim("tlbar_hide",ui.tlbar_handle,ui.tlbar_handle.x-SS*2-1,ui.tlbar_handle.y)
-		anim:add_anim("tlbar_show",ui.tlbar_handle,ui.tlbar_handle.x,ui.tlbar_handle.y)
-	end
-
-	function init_ibar()
-		group(ui.grp_ui)
-			ui.grp_ibar = UIGroup()
-
-		group(ui.grp_ibar)
-			ui.ibar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS+2)
-			anchor(ui.ibar)
-				ui.lbl_nfo=Label(SS*8,2,"",cols.text)
-				ui.lbl_mouse=Label(2,2,"",cols.dim_text)
-				ui.btn_opts=TxtBtn(26,0,"(O)",toggle_options)
-				ui.btn_help=TxtBtn(28,0,"(H)",toggle_help)
-			anchor()
-		group()
-
-		ui.ibar:set_pos(-1, SS*16-1)
-
-		anim:add_anim("ibar_hide", ui.ibar, ui.ibar.x, ui.ibar.y+SS+1)
-		anim:add_anim("ibar_show", ui.ibar, ui.ibar.x, ui.ibar.y)
-
-		toggle_ibar()
-	end
-
-	function init_topbar()
-		group(ui.grp_ui)
-			ui.grp_tbar = UIGroup()
-		group(ui.grp_tbar)
-			ui.tbar = UIPanel(bar_bg, bar_outline, 0, 0, SS*30+2, SS+2)
-
-			anchor(ui.tbar)
-				Label(SS*15-1, 2, "C:         |         /", cols.text)
-				ui.lbl_spd    = Label(2,  2, "Sp: 1", cols.text)
-				ui.lbl_gens   = Label(SS*6,  2, "G: ", cols.text)
-				ui.lbl_cells2 = Label(SS*20, 2, "",    cols.text, 2)
-				ui.lbl_cells3 = Label(SS*25, 2, "",    cols.text, 2)
-				ui.lbl_cells4 = Label(SS*30, 2, "",    cols.text, 2)
-			anchor()
-		group()
-
-		ui.btn_stop:turn_on()
-
-		ui.grp_pause_btn:disable()
-
-		ui.tbar:set_pos(-1, -1)
-
-		anim:add_anim("topbar_hide", ui.tbar, ui.tbar.x, ui.tbar.y-SS-1)
-		anim:add_anim("topbar_show", ui.tbar, ui.tbar.x, ui.tbar.y)
-	end
-
-	function init_options()
-		group(ui.grp_ui)
-			ui.grp_opts = UIGroup()
-
-		group(ui.grp_opts)
-			ui.cbx_deadc = CheckBox(SS*2, SS*4,  "draw dead cells",      opts[draw_d_cells], toggle_opt, {draw_d_cells})
-			ui.cbx_pad   = CheckBox(SS*2, SS*5,  "use cell padding",     opts[use_padding],  function()toggle_padding()end)
-			ui.rand_cb   = CheckBox(SS*2, SS*6, "reset on randomize",   opts[rand_reset],   toggle_opt, {rand_reset})
-			ui.wrap_cb   = CheckBox(SS*2, SS*11,  "wrap around edges",    opts[wrap_around],  toggle_opt, {wrap_around})
-			ui.rand_cb   = CheckBox(SS*2, SS*12, "randomize at startup", opts[rand_start],   toggle_opt, {rand_start})
-
-			ui.btn_opts_out=TxtBtn(13, 16," O >> ", toggle_options)
-		group()
-
-		ui.grp_opts:disable()
-	end
-
-	function set_tooltip(tt)
-		ui.lbl_nfo:set_text(tt)
-	end
-
-	function toggle_eraser()
-		eraser = not eraser
-		ui.tlbar:reset_tls()
-		ui.tlbar.tls[tl.type]:toggle_state()
-	end
-
-	function toggle_d_cells()
-		opts[draw_d_cells] = not opts[draw_d_cells]
-	end
-
-	function toggle_topbar()
-		use_topbar = not use_topbar
-		ui.grp_tbar:set_enabled(use_topbar)
-	end
-
-	function toggle_ibar()
-		use_ibar = not use_ibar
-		ui.grp_ibar:set_enabled(use_ibar)
-	end
-
-	function init_ui()
-		ui.grp_ui=UIGroup()
-		ui.ui_bg=tc.element({
-			x=0,y=0,w=240,h=136,
-			onStartHover=function()mouse_on_ui=false end,
-			onEndHover=function()mouse_on_ui=true end
-		})
-
-		init_tlbar()
-		init_ibar()
-		init_topbar()
-		init_options()
-
-		toggle_topbar()
-	end
---=--=--=--=--=--=--=--=--=--=--=--=--
-
-
---=--=--=--=--=--=--=--=--=--=--=--=--
 -- Flood Fill
+	-- TODO: revise this
 	local function _has_pix(v,x,y,s,c,elipse)
 		if elipse then
-			return x<1or y<1or x>GW or y>GH
+			return x<1 or y<1 or x>GW or y>GH
 			or s[y][x]==1
 		else
-			return x<1or y<1or x>GW or y>GH
-			or s[y][x]==1or c[y][x]==v
+			return x<1 or y<1 or x>GW or y>GH
+			or s[y][x]==1 or c[y][x]==v
 		end
 	end
 
 	--   Scanline FT
 	local function scnln_ft(x, y, ellipse,v)
 		local pts={}
-		ins(pts,_vec_xy(x,y)) -- add the initial point
+		ins(pts,vec2(x,y)) -- add the initial point
 
 		local s,c,tidx,pt,set_abv,set_blw,sy=cells[sel],cells[cur],#pts
 		repeat
@@ -823,11 +1309,11 @@ local tl,ui,rand_cells
 				sy[x]=1
 				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then ins(pts,_vec_xy(x,pt.y-1))end
+					if not set_abv then ins(pts,vec2(x,pt.y-1))end
 				end
 				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then ins(pts,_vec_xy(x,pt.y+1))end
+					if not set_blw then ins(pts,vec2(x,pt.y+1))end
 				end
 				x=x+1
 			end
@@ -838,11 +1324,11 @@ local tl,ui,rand_cells
 				sy[x]=1
 				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then ins(pts,_vec_xy(x,pt.y-1))end
+					if not set_abv then ins(pts,vec2(x,pt.y-1))end
 				end
 				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then ins(pts,_vec_xy(x,pt.y+1))end
+					if not set_blw then ins(pts,vec2(x,pt.y+1))end
 				end
 				x=x-1
 			end
@@ -854,101 +1340,55 @@ local tl,ui,rand_cells
 		scnln_ft(x,y,ellipse,eraser and 0 or 1)
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
-
-
+	--[[ sdist - distance squared              001 ]]
+		local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
+	--[[ Bounds checking                       003 ]]
+		local function inbounds(x,y)
+			return x>0 and x<=GW and y>0 and y<=GH
+		end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Geometry stuff
-	-- Rect functions
-	local function _rect_hollow(r)
-		local s,p1,p2=cells[sel],r.tl,r.br
-		for j=p1.y,p2.y do
-			s[j][r.x]=1
-			s[j][r.x2]=1
-		end
-		for i=p1.x,p2.x do
-			s[r.y][i]=1
-			s[r.y2][i]=1
-		end
+	local function point(x,y)
+		return {x=x,y=y}
 	end
 
-	local function _rect_filled(r)
-		local s,sj=cells[sel]
-		for j=r.y,r.y2 do
-			sj=s[j]
+	local geom={}
+	geom={
+		--TODO: these functiosn shouldn't draw anything,
+		--      they should just return a list of points
+		_rect_hollow=function(r)
+			local t={}
+			for j=r.y,r.y2 do
+				t[#t+1]=point(r.x,j)
+				t[#t+1]=point(r.x2,j)
+			end
 			for i=r.x,r.x2 do
-				sj[i]=1
+				t[#t+1]=point(i,r.y)
+				t[#t+1]=point(i,r.y2)
 			end
-		end
-	end
-
-	local function _line(x1, y1, x2, y2)
-		local s,pts=cells[sel],Bres.line(x1,y1,x2,y2)
-		for i=1,#pts do
-			local p=pts[i]
-			s[p.y][p.x]=1
-		end
-	end
-
-	-- Ellipse
-	----------------------------------
-	local function _put_ellipse_pixels(xc, yc, x, y)
-		local s = cells[sel]
-		s[min(yc+y,GH)][min(xc+x,GW)]=1
-		s[min(yc+y,GH)][max(xc-x, 1)]=1
-		s[max(yc-y, 1)][min(xc+x,GW)]=1
-		s[max(yc-y, 1)][max(xc-x, 1)]=1
-	end
-
-	-- not working properly
-	local function bres_ellipse(xc, yc, width, height)
-		if width <= 0 or height <= 0 then return end
-
-		local a2, b2 = width*width, height*height
-		local fa2, fb2 = 4*a2, 4*b2
-		local x, y, sigma = 0, 0, 0
-
-		-- /* first half */
-		x = 0
-		y = height
-		sigma = 2*b2 + a2*(1-2*height)
-		while b2*x <= a2*y do
-			_put_ellipse_pixels(xc, yc, x, y)
-			if sigma >= 0 then
-				sigma = sigma + fa2*(1-y)
-				y = y-1
+			return t
+		end,
+		_rect_filled=function(r)
+			local t={}
+			for j=r.y,r.y2 do
+				for i=r.x,r.x2 do
+					t[#t+1]=point(i,j)
+				end
 			end
-			sigma = sigma + b2*((4*x)+6)
-			x = x+1
-		end
-		-- /* second half */
-		x = width
-		y = 0
-		sigma = 2*a2 + b2*(1-2*width)
-		while a2*y <= b2*x do
-			_put_ellipse_pixels(xc, yc, x, y)
-			if sigma >= 0 then
-				sigma = sigma + fb2 * (1 - x)
-				x = x -1
+			return t
+		end,
+		_circle_filled=function(x,y,x1,y1,x2,y2,r)
+			local t,R={},r*r
+			for j=y-r,y+r do
+				for i=x-r,x+r do
+					if sdist(i,j,x,y)<=R+1 then
+						t[#t+1]=point(i,j)
+					end
+				end
 			end
-			sigma = sigma + a2 * ((4 * y) + 6)
-			y = y+1
+			return t
 		end
-	end
-
-	local function _draw_ellipse(r, center, filled)
-		local p1, p2 = r.tl, r.br
-		local Rx, Ry = (p2.x-p1.x)//2, (p2.y-p1.y)//2
-
-		if not center then bres_ellipse(p1.x+Rx, p1.y+Ry, Rx, Ry)
-		else               bres_ellipse(p1.x, p1.y, Rx, Ry)
-		end
-
-		if filled then
-			if center then flood_fill(p1.x, p1.y, true)
-			else flood_fill(r.c.x+p1.x, r.c.y+p1.y, true)
-			end
-		end
-	end
+	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
 
@@ -957,56 +1397,54 @@ local tl,ui,rand_cells
 	tl = {
 		type="brush",
 		orgn=nil,
-		w=0,
-		h=0,
+		w=0,h=0,
 		mode1=false,  -- filled
 		mode2=false,  -- square
 		mode3=false,  -- centered on mouse
-		is_drawing=false,
+		drawing=false,
 		brush_size=0,
-		bbox=nil,
+		max_size=10,
 		cats={},
 		cur_pats={},
-		patt_pid=0,
 		cur_cat=1,
 		cur_pat=1,
 	}
-	function tl.start(x, y)
-		tl.orgn = vec(x, y)
-		tl.is_drawing = true
+	function tl.start(t,x, y)
+		t.orgn = vec2(x, y)
+		t.drawing = true
 	end
 
-	function tl.stop()
-		tl.is_drawing = false
+	function tl.stop(t)
+		t.drawing = false
 	end
 
-	function tl.toggle(x, y)
-		if not tl.is_drawing then
-			tl.start(x, y)
+	function tl.toggle(t,x, y)
+		if not t.drawing then
+			t:start(x, y)
 		else
-			tl.stop()
+			t:stop()
 		end
 	end
 
-	function tl.cancel()
-		if tl.type ~= nil then
-			tl.stop()
+	function tl.cancel(t)
+		if t.type ~= nil then
+			t:stop()
 		end
 	end
 
-	function tl.commit(draw)
+	function tl.commit(t,draw)
 		local s,c,sj,cj=cells[sel],cells[cur]
 		for j=1,GH do
 			sj,cj=s[j],c[j]
 			for i=1,GW do
 				if sj[i]==1then
-					cj[i]=draw and 1or 0
+					cj[i]=draw and 1 or 0
 				end
 			end
 		end
 	end
 
-	function tl.clear()
+	function tl.clear(t)
 		local s,sj=cells[sel]
 		for j=1,GH do
 			sj=s[j]
@@ -1016,99 +1454,115 @@ local tl,ui,rand_cells
 		end
 	end
 
-	function tl.switch(t)
-		tl.cancel()
-		tl.type = t
-		local rect_vis,circ_vis=(t=="rect"and ui_vis),(t=="circle"and ui_vis)
-		ui.grp_rect:set_enabled(rect_vis)
-		ui.grp_circ:set_enabled(circ_vis)
+	function tl.switch(t,tp, force)
+		if t.type~=tp or force then
+			t:cancel()
+			t.type = tp
+		end
 	end
 
-	local function _set_size()
-		tl.w = tl.cats[tl.cur_cat][tl.cur_pat].w
-		tl.h = tl.cats[tl.cur_cat][tl.cur_pat].h
+	function tl.expand(t)
+		t.brush_size = min(t.brush_size+1, t.max_size)
 	end
 
-	function tl.expand()
-		tl.brush_size = min(tl.brush_size+1, 5)
+	function tl.contract(t)
+		t.brush_size = max(t.brush_size-1, 0)
 	end
 
-	function tl.contract()
-		tl.brush_size = max(tl.brush_size-1, 0)
-	end
-
-	local function _brush_pts(x,y)
+	-- tl.brush_type="square"
+	tl.brush_type="round"
+	function tl._brush_pts(t,x,y)
 		-- TODO: improve this crappy brush
 		-- r=radius
-		local r,s,sj=tl.brush_size,cells[sel]
-		for j=y-r,y+r do
-			if j>0 and j<=GH then
-				sj=s[j]
-				for i=x-r,x+r do
-					if i>0 and i<=GW then
-						sj[i]=1
-					end
-				end
+		local path= t.drawing and Bres.line(g_lmx,g_lmy,g_mx,g_my) or {point(x,y)}
+		-- local path=Bres.line(g_lmx,g_lmy,x,y)
+		local set,p={}
+		local pts,R={},t.brush_size
+		for i=1, #path do
+			local p=path[i]
+			local xmin,ymin,xmax,ymax=
+					max(1, p.x-R),
+					max(1, p.y-R),
+					min(GW, p.x+R),
+					min(GH, p.y+R)
+
+			if t.brush_type=="square" then    pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
+			elseif t.brush_type=="round" then pts=geom._circle_filled(p.x,p.y,xmin,ymin,xmax,ymax,R)
+			end
+
+			for _,v in ipairs(pts)do
+				set[v]=1
+			end
+		end
+
+		pts={}
+		for k,v in pairs(set) do
+			pts[#pts+1]=k
+		end
+		tl._commit_pts(pts)
+	end
+
+	function tl._commit_pts(pts)
+		local s=cells[sel]
+		for _,p in ipairs(pts)do
+			if inbounds(p.x,p.y) then
+				s[p.y][p.x]=1
 			end
 		end
 	end
 
-	local function _rect_pts(x, y)
-		if tl.is_drawing then
-			local p,s -- rect pos,size
-			if tl.mode3 then -- if centered
-				p=vec(tl.orgn.x,tl.orgn.y)
-				s=vec(abs(x-tl.orgn.x),abs(y-tl.orgn.y))*2
-				local r=Rect(p-s//2, s)
-				r.x=max(1,r.x)
-				r.y=max(1,r.y)
-				r.x2=min(GW,r.x2)
-				r.y2=min(GH,r.y2)
-				tl.bbox=r
-			else
-				p=vec(min(x,tl.orgn.x),min(y,tl.orgn.y))
-				s=vec(abs(x-tl.orgn.x),abs(y-tl.orgn.y))
-				tl.bbox=Rect(p,s)
+	function tl._base_rect(t,x,y)
+		local o,p1,p2,s,r=t.orgn,{}
+		p1,p2=vec2(min(x,o.x),min(y,o.y)),vec2(max(x,o.x),max(y,o.y))
+		s=p2-p1
+		if t.mode2 then -- if square
+			s=vec2(min(s.x,s.y),min(s.x,s.y))
+			if x<o.x then p1.x=p1.x+(o.x-(p1.x+s.x))end
+			if y<o.y then p1.y=p1.y+(o.y-(p1.y+s.y))end
+		end
+		return rec2(p1,s)
+	end
+
+	function tl._rect_pts(t,x,y)
+		if t.drawing then
+			local r,pts=tl:_base_rect(x,y)
+			if t.mode3 then r.p=t.orgn-r.s//2 end -- if centered
+			if t.mode1 then pts=geom._rect_filled(r)
+			else            pts=geom._rect_hollow(r)
 			end
-			if tl.mode2 then tl.bbox=tl.bbox:sq()end
-			if tl.mode1 then
-				_rect_filled(tl.bbox)
-			else
-				_rect_hollow(tl.bbox)
-			end
+			tl._commit_pts(pts)
 		end
 	end
 
-	local function _circle_pts(x, y)
-		if tl.is_drawing then
-			tl.bbox = Rect(
-				vec(min(x, tl.orgn.x), min(y, tl.orgn.y)),
-				vec(abs(x-tl.orgn.x), abs(y-tl.orgn.y))
-			)
-			if tl.mode2 then tl.bbox = tl.bbox:sq() end
-
-			_draw_ellipse( tl.bbox, tl.mode3, tl.mode1 )
+	function tl._circle_pts(t,x,y)
+		if t.drawing then
+			local r,pts,hw,hh=tl:_base_rect(x,y)
+			if t.mode3 then r.p=t.orgn-r.s//2 end -- if centered
+			hw,hh=r.w//2,r.h//2
+			pts=Bres.ellipse(r.x+hw,r.y+hh,hw,hh)
+			tl._commit_pts(pts)
+			if t.mode1 then flood_fill(r.c.x,r.c.y,true)end
 		end
 	end
 
-	local function _line_pts(x, y)
-		if tl.is_drawing then
-			_line(tl.orgn.x, tl.orgn.y, x, y)
+	function tl._line_pts(t,x, y)
+		if t.drawing then
+			tl._commit_pts(Bres.line(t.orgn.x,t.orgn.y,x,y))
 		end
 	end
 
-	local function _fill_pts(x, y)
+	function tl._fill_pts(t,x, y)
 		flood_fill(x, y)
 	end
 
-	local function _patt_pts(x, y)
-		local s,p=cells[sel],tl.cats[tl.cur_cat][tl.cur_pat].layout
-		for j=1,tl.h do
-			local gy=j+(y-1)-tl.h
+	function tl._patt_pts(t,x, y)
+		local s,p,gy,sj,pj,gx=cells[sel],t.cats[t.cur_cat][t.cur_pat].layout
+		for j=1,t.h do
+			gy=j+(y-1)-t.h
 			if gy>0 and gy<=GH then
-				local sj,pj=s[gy],p[j]
-				for i=1,tl.w do
-					local gx=i+(x-1)-tl.w
+				sj,pj=s[gy],p[j]
+				for i=1,t.w do
+					gx=i+(x-1)-t.w
 					if gx>0 and gx<=GW then
 						sj[gx]=pj[i]
 					end
@@ -1117,94 +1571,130 @@ local tl,ui,rand_cells
 		end
 	end
 
-	local _tl_draw_fns = {
-		brush   = _brush_pts,
-		rect    = _rect_pts,
-		circle  = _circle_pts,
-		line    = _line_pts,
-		fill    = _fill_pts,
-		pattern = _patt_pts,
+	tl._draw_fns = {
+		brush   = tl._brush_pts,
+		rect    = tl._rect_pts,
+		circle  = tl._circle_pts,
+		line    = tl._line_pts,
+		fill    = tl._fill_pts,
+		pattern = tl._patt_pts,
 	}
 
-	function tl.draw_points(x, y)
-		_tl_draw_fns[tl.type](x, y)
+	function tl.draw_points(t,x, y)
+		t._draw_fns[t.type](t,x, y)
 	end
 
-	local function _new_pat(id, name, layout)
-		return {
-			id = id,
-			name = name,
-			layout = layout,
-			w = #layout[1],
-			h = #layout
-		}
+	function tl._set_size(t)
+		t.w = t.cats[t.cur_cat][t.cur_pat].w
+		t.h = t.cats[t.cur_cat][t.cur_pat].h
 	end
 
-	function tl.set_category(c)
-		tl.cur_cat = c
-		tl.cur_pat = tl.cur_pats[tl.cur_cat]
-		_set_size()
+	function tl.set_category(t,c)
+		t.cur_cat = c
+		t.cur_pat = t.cur_pats[t.cur_cat]
+		t:_set_size()
 	end
 
-	function tl.next_pattern()
-		local old_pat, new_pat = tl.cur_pat, clamp(tl.cur_pats[tl.cur_cat]+1, 1, #tl.cats[tl.cur_cat])
+	function tl.next_pattern(t)
+		local cat = t.cur_cat
+		local old_pat, new_pat = t.cur_pat, clamp(t.cur_pats[cat]+1, 1, #t.cats[cat])
 		if new_pat ~= old_pat then
-			tl.cur_pat = new_pat
-			tl.cur_pats[tl.cur_cat] = new_pat
-			_set_size()
+			t.cur_pat = new_pat
+			t.cur_pats[cat] = new_pat
+			t:_set_size()
 		end
 	end
 
-	function tl.prev_pattern()
-		local old_pat, new_pat = tl.cur_pat, clamp(tl.cur_pats[tl.cur_cat]-1, 1, #tl.cats[tl.cur_cat])
+	function tl.prev_pattern(t)
+		local old_pat, new_pat = t.cur_pat, clamp(t.cur_pats[t.cur_cat]-1, 1, #t.cats[t.cur_cat])
 		if new_pat ~= old_pat then
-			tl.cur_pat = new_pat
-			tl.cur_pats[tl.cur_cat] = new_pat
-			_set_size()
+			t.cur_pat = new_pat
+			t.cur_pats[t.cur_cat] = new_pat
+			t:_set_size()
 		end
 	end
 
-	local function _nid()
-		tl.patt_pid = tl.patt_pid + 1
-		return tl.patt_pid
+	function tl._parse_patt(t,p)
+		local _add_cell,_getnum=
+			function(a,v,n)
+				for _=1,n do a[#a+1]=v end
+			end,
+			function(i,str)
+				local s,nex=str:sub(i,i)
+				while i<i+4 do -- inf loop guard
+					i=i+1
+					nex=str:sub(i,i)
+					if nex=="."or nex=="o" then break end
+					s=s..nex
+				end
+				return tonum(s),i
+			end
+
+		local lns=p:split(' ')
+		local w,h,name,pat,i,c,num,row=tonum(lns[1]),tonum(lns[2]),lns[3],{}
+		for i=1,3 do rem(lns,1)end
+		for _,l in ipairs(lns) do
+			i,row=1,{}
+			while i <= w do
+				c=l:sub(i,i)
+				if c==""then
+					_add_cell(row,0,w-#row)
+					break
+				end
+				num=tonum(c)
+				if not num then
+					_add_cell(row,c=="o" and 1 or 0,1)
+					i=i+1
+				else
+					num,i=_getnum(i,l)
+					c=l:sub(i,i)
+					_add_cell(row,c=="o" and 1 or 0,num)
+					i=i+1
+				end
+			end
+			pat[#pat+1]=row
+		end
+		return {w=w,h=h,name=name,layout=pat}
 	end
 
-	function tl.init_pats()
-		tl.cats = {
-			{
-				_new_pat( _nid(), "1-1 Unnamed", {{0,1,0},{1,0,1},{1,0,1},{0,1,0}} ),
-				_new_pat( _nid(), "1-2 Loaf", {{0,1,1,0},{1,0,0,1},{0,1,0,1},{0,0,1,0}} )
+	function tl.init_pats(t)
+		local pats={
+			{ -- statics
+				"3 4 '' .o o.o o.o .o",
+				"4 4 'Loaf' .2o o2.o .o.o 2.o",
 			},
-			{
-				_new_pat( _nid(), "2-1 Toad", {{0,1,1,1},{1,1,1,0}} ),
-				_new_pat( _nid(), "2-2 Unnamed", {{0,1,0},{0,1,0},{1,0,1},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{1,0,1},{0,1,0},{0,1,0}} ),
-				_new_pat( _nid(), "2-3 Unnamed", {{1,1,0,0},{1,0,0,0},{0,0,0,1},{0,0,1,1}} ),
-				_new_pat( _nid(), "2-4 Pulsar", {{0,0,1,1,1,0,0,0,1,1,1,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0},{1,0,0,0,0,1,0,1,0,0,0,0,1},{1,0,0,0,0,1,0,1,0,0,0,0,1},{1,0,0,0,0,1,0,1,0,0,0,0,1},{0,0,1,1,1,0,0,0,1,1,1,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,1,1,1,0,0,0,1,1,1,0,0},{1,0,0,0,0,1,0,1,0,0,0,0,1},{1,0,0,0,0,1,0,1,0,0,0,0,1},{1,0,0,0,0,1,0,1,0,0,0,0,1},{0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,1,1,1,0,0,0,1,1,1,0,0}} ),
-				_new_pat( _nid(), "2-5 Unnamed", {{0,0,0,0,0,0,0,0,1,1,0,0,1,1,0},{0,0,0,0,0,0,0,0,1,0,0,0,0,1,0},{0,0,0,0,0,0,0,0,0,1,1,1,1,0,0},{0,0,0,0,0,0,1,1,1,0,0,0,1,0,1},{0,0,1,0,0,0,1,0,0,1,0,0,0,1,1},{0,1,0,1,0,0,0,1,0,1,0,0,0,0,0},{1,0,1,0,0,1,0,1,0,1,1,0,0,0,0},{1,0,0,1,1,0,1,0,0,0,1,0,0,0,0},{0,1,0,1,0,0,1,0,1,1,0,0,0,0,0},{1,1,0,1,0,1,0,1,0,0,1,0,0,0,0},{1,0,0,1,0,1,0,1,0,1,1,0,0,0,0},{0,1,1,0,0,0,0,0,0,1,0,0,0,0,0},{0,0,0,1,1,1,1,1,0,1,0,0,0,0,0},{0,0,0,1,0,0,0,0,1,0,0,0,0,0,0},{0,0,0,0,1,1,1,1,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,1,1,0,0,0,0,0,0,0,0,0},{0,0,0,0,1,1,0,0,0,0,0,0,0,0,0}} ),
+			{ -- oscilators
+				"4 2 'Toad' .3o 3o",
+				"3 10 '' .o .o o.o .o .o .o .o o.o .o .o",
+				"4 4 '' 2o o 3.o 2.2o",
+				"13 13 'Pulsar' 2.3o3.3o . o4.o.o4.o o4.o.o4.o o4.o.o4.o 2.3o3.3o . 2.3o3.3o o4.o.o4.o o4.o.o4.o o4.o.o4.o . 2.3o3.3o",
+				"15 18 '' 8.2o2.2o 8.o4.o 9.4o 6.3o3.o.o 2.o3.o2.o3.2o .o.o3.o.o o.o2.o.o.2o o2.2o.o3.o .o.o2.o.2o 2o.o.o.o2.o o2.o.o.o.2o .2o6.o 3.5o.o 3.o4.o 4.4o . 4.2o 4.2o",
 			},
-			{
-				_new_pat( _nid(), "3-1 R Pentomino", {{0,1,1},{1,1,0},{0,1,0}} ),
-				_new_pat( _nid(), "3-2 Unnamed", {{1,1,0,0,0,0,1,0},{0,1,0,0,0,1,1,1}} ),
-				_new_pat( _nid(), "3-3 Unnamed", {{1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1},{1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1},{0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,1,1,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,1,0,1,0,1,1,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0},{0,1,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1,1},{0,0,1,0,1,0,1,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1},{0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}} ),
-				_new_pat( _nid(), "3-4 Unnamed", {{1,1,1,1,1,1,1,1,0,1,1,1,1,1,0,0,0,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,0,1,1,1,1,1}} ),
-				_new_pat( _nid(), "3-5 Unnamed", {{0,1,0,0,0,0,0},{0,0,0,1,0,0,0},{1,1,0,0,1,1,1}} ),
-				_new_pat( _nid(), "3-6 Unnamed", {{1,1,1,0,1},{1,0,0,0,0},{0,0,0,1,1},{0,1,1,0,1},{1,0,1,0,1}} ),
-				_new_pat( _nid(), "3-6 Unnamed", {{0,0,0,0,0,0,1,0},{0,0,0,0,1,0,1,1},{0,0,0,0,1,0,1,0},{0,0,0,0,1,0,0,0},{0,0,1,0,0,0,0,0},{1,0,1,0,0,0,0,0}} ),
+			{ -- explosive
+				"3 3 'R_Pentomino' .2o 2o .o",
+				"8 2 '' 2o4.o .o3.3o",
+				"29 10 '' 2o14.2o9.2o 2o15.2o8.2o 13.5o 13.4o12. . 3.2o8.4o 2.o.o.2o5.5o .2o3.2o9.2o8.2o 2.o.o.2o8.2o9.2o 3.2o",
+				"39 1 '' 8o.5o3.3o6.7o.5o",
+				"7 3 '' .o 3.o 2o2.3o",
+				"5 5 '' 3o.o o 3.2o .2o.o o.o.o",
+				"8 6 '' 6.o 4.o.2o 4.o.o 4.o 2.o o.o",
 			},
-			{
-				_new_pat( _nid(), "4-1 Glider", {{0,0,1},{1,0,1},{0,1,1}} ),
-				_new_pat( _nid(), "4-2 Light-Weight Spaceship", {{1,0,0,1,0},{0,0,0,0,1},{1,0,0,0,1},{0,1,1,1,1}} ),
+			{ -- gliders
+				"3 3 'Glider' 2.o o.o .2o",
+				"5 4 'Light-Weight_Spaceship' o2.o 4.o o3.o .4o",
 			},
-			{
-				_new_pat( _nid(), "5-1 Gosper's Glider Gun", {{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1},{0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1},{1,1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,1,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},{0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}} ),
-			}
+			{ -- guns
+				"36 9 'Glider_Gun' 24.o11. 22.o.o 12.2o6.2o12.2o 11.o3.o4.2o12.2o 2o8.o5.o3.2o 2o8.o3.o.2o4.o.o 10.o5.o7.o 11.o3.o 12.2o",
+			},
 		}
-
-		for i=1, #tl.cats do
-			tl.cur_pats[i] = 1
+		for j,c in ipairs(pats) do
+			t.cur_pats[j]=1
+			t.cats[j]={}
+			for i,p in ipairs(c) do
+				t.cats[j][i]=t:_parse_patt(p)
+			end
 		end
-
-		_set_size()
+		t:_set_size()
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1212,8 +1702,8 @@ local tl,ui,rand_cells
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- init
 	function toggle_padding()
-		toggle_opt(use_padding)
-		set_padding(opts[use_padding])
+		toggle_opt(USE_PADDING)
+		set_padding(opts[USE_PADDING])
 	end
 
 	function set_padding(bool)
@@ -1227,7 +1717,7 @@ local tl,ui,rand_cells
 		for j=1,GH do
 			ccj=cc[j]
 			for i=1,GW do
-				b=rand()<0.5 and 1or 0
+				b=rand()<0.5 and 1 or 0
 				ccj[i]=b
 				l_cells=l_cells+b
 			end
@@ -1247,51 +1737,55 @@ local tl,ui,rand_cells
 	end
 
 	function fill_grid(fill)
-		local cc,ccj=cells[cur]
+		local cc,v,ccj=cells[cur],fill and 1 or 0
 		for j=1,GH do
 			ccj=cc[j]
 			for i=1,GW do
-				ccj[i]=fill and 1or 0
+				ccj[i]=v
 			end
 		end
 		l_cells=(fill and GW*GH or 0)
 	end
 
-	function set_zoom(dir, wrp)
-		local z,limit = opts[zoom_lvl],wrp and wrap or clamp
 
-		if dir == 1 then 	z = limit(z * 2,  1, 8)
-		else				z = limit(z // 2, 1, 8)
-		end
 
-		if z ~= opts[zoom_lvl] then
-			CS = SS//z
-			GW = 30*z
-			GH = 17*z
-			opts[zoom_lvl] = z
-			set_padding(opts[use_padding])
+	function dec_zoom()set_zoom(opts[ZOOM_LVL]-1,true)end
+	function inc_zoom()set_zoom(opts[ZOOM_LVL]+1,true)end
+
+	function set_zoom(val, wrp, force)
+		local limit = wrp and wrap or clamp
+		val = limit(val, 1, 4)
+
+		local n=zoom_mults[val]
+
+		if val ~= opts[ZOOM_LVL] or force then
+			CS = 8//n
+			GW = 30*n
+			GH = 17*n
+			opts[ZOOM_LVL] = val
+			set_padding(opts[USE_PADDING])
 			gens = 0
 			l_cells = 0
 			create_cells()
 			TOT_CELLS = GW*GH
 			if not paused then pause() end
-			pmem(zoom_lvl, z)
+			pmem(ZOOM_LVL, val)
 		end
 	end
 
 	function init()
-		set_padding(opts[use_padding])
-		tl.orgn = vec()
-		tl.bbox = Rect()
-		tl.init_pats()
-		create_cells()
-		if opts[rand_start] then rand_cells() end
+		set_padding(opts[USE_PADDING])
+		tl.orgn = vec0()
+		tl:init_pats()
+		-- create_cells()
+		set_zoom(pmem(ZOOM_LVL),false,true)
+		if opts[RAND_START] then rand_cells() end
 
 		anim = Animator()
 
-		init_ui()
+		-- init_ui()
 
-		ui.tlbar.tls["brush"]:toggle_state()
+		-- ui.tlbar.tls["brush"]:toggle_state()
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1314,12 +1808,12 @@ local tl,ui,rand_cells
 				p[(j+1>GH and 1 or j+1)]
 
 			for i=1,GW do
-				l,r=(i-1<1 and GW or i-1),(i+1>GW and 1or i+1)
+				l,r=(i-1<1 and GW or i-1),(i+1>GW and 1 or i+1)
 
 				-- count alive neighbors
 				n=pu[l]+pu[i]+pu[r]+pj[l]+pj[r]+pd[l]+pd[i]+pd[r]
 
-				b=(n==3or(n==2 and pj[i]==1))and 1or 0
+				b=(n==3or(n==2 and pj[i]==1))and 1 or 0
 				cj[i]=b
 				lc=lc+b
 			end
@@ -1349,7 +1843,7 @@ local tl,ui,rand_cells
 				 +(pd and pd[i]or 0)
 				 +(pd and pd[r]or 0)
 
-				b=(n==3or(n==2 and pj[i]==1))and 1or 0
+				b=(n==3or(n==2 and pj[i]==1))and 1 or 0
 				cj[i]=b
 				lc=lc+b
 			end
@@ -1358,7 +1852,7 @@ local tl,ui,rand_cells
 	end
 
 	local function next_gen()
-		if opts[wrap_around] then
+		if opts[WRAP_AROUND] then
 			ng_wrap()
 		else
 			ng_nowrap()
@@ -1366,50 +1860,34 @@ local tl,ui,rand_cells
 		gens=gens+1
 	end
 
-	local function update_tools()
-		if tl.type == "rect" then
-			ui.icn_r_sqr:set_state(sh_mod)
-			ui.icn_r_fill:set_state(ct_mod)
-			ui.icn_r_cntr:set_state(al_mod)
-		elseif tl.type == "circle" then
-			ui.icn_c_sqr:set_state(sh_mod)
-			ui.icn_c_fill:set_state(ct_mod)
-			ui.icn_c_cntr:set_state(al_mod)
-		end
-	end
-
 	local function update_ui()
 	bma("ui update",function()--@bm
-		tc.update(mx, my, m1, m3, m2)
+		if cur_scr == GAME_SCR then
+			PlaybackBar("pb", pb_rect)
+			Toolbar("tb",tb_rect)
+		end
 	end)--@bm
 	end
 
-	local function update(dt)
+	local function update()
 	bma("update game",function()--@bm
 		if cur_scr == GAME_SCR then
-			update_tools()
-			-- if tl.is_drawing then monitor("bb  ", tl.bbox) end
-			if use_ibar then ui.lbl_nfo:set_text("") end
+			-- if use_ibar then ui.lbl_nfo:set_text("") end
 
-			if not mouse_on_ui then
-				tl.clear()
-				tl.draw_points(g_mx, g_my)
+			if not ui.mouse_on_ui then
+				tl:clear()
+				tl:draw_points(g_mx,g_my)
 			end
-			ui.lbl_mouse:set_text(opts[zoom_lvl].." | "..g_mx..", "..g_my)
+			-- ui.lbl_mouse:set_text(opts[ZOOM_LVL].." | "..g_mx..", "..g_my)
 
-			if not paused then
+			if not paused and (upd_delay==0 or f%upd_delay==0) then
 				bma("compute gen", next_gen)--@bm
 			end
 
-			ui.lbl_gens:set_text("G: "..gens)
-			ui.lbl_cells2:set_text(tostr(l_cells))
-			ui.lbl_cells3:set_text(tostr(TOT_CELLS-l_cells))
-			ui.lbl_cells4:set_text(tostr(TOT_CELLS))
-
 			anim:update()
-			update_ui()
+			-- update_ui()
 		elseif cur_scr == OPTS_SCR then
-			update_ui()
+			-- update_ui()
 		end
 	end)--@bm
 	end
@@ -1419,48 +1897,74 @@ local tl,ui,rand_cells
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- render
 	local function render_rects()
-		local rect,ddcs,s,c=rect,opts[draw_d_cells],cells[sel],cells[cur]
-		local rs,ca,cd,cs=CS-pad,cols.alive,cols.dead,(eraser and cols.erasing or cols.selected)
-		local sj,cj,x,y
+		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[sel],cells[cur],CS-pad,thm.cell,(eraser and thm.erase or thm.select)
 		for j=1,GH do
 			y=(j-1)*CS+pad
 			sj,cj=s[j],c[j]
 			for i=1,GW do
 				x=(i-1)*CS+pad
-				if     not mouse_on_ui and sj[i]==1 then rect(x,y,rs,rs,cs)
+				if sj[i]==1 and not ui.mouse_on_ui then rect(x,y,rs,rs,cs)
 				elseif cj[i]==1 then rect(x,y,rs,rs,ca)
-				elseif ddcs then rect(x,y,rs,rs,cd)
 				end
 			end
 		end
-		if not tl.is_drawing and not mouse_on_ui then
+		if not tl.drawing and not ui.mouse_on_ui then
 			rect((g_mx-1)*CS+pad,(g_my-1)*CS+pad,CS-pad,CS-pad,cs)
 		end
 	end
 
 	local function render_pix()
-		local pix,ddcs,s,c=pix,opts[draw_d_cells],cells[sel],cells[cur]
-		local ca,cd,cs=cols.alive,cols.dead,(eraser and cols.erasing or cols.selected)
-		local sj,cj,x,y
+		local pix,s,c,ca,cs,sj,cj,y=pix,cells[sel],cells[cur],thm.cell,(eraser and thm.erase or thm.select)
 		for j=1,GH do
-			y=j-1
-			sj,cj=s[j],c[j]
+			y,sj,cj=j-1,s[j],c[j]
 			for i=1,GW do
-				x=i-1
-				if not mouse_on_ui and sj[i]==1 then pix(x,y,cs)
-				elseif cj[i]==1 then pix(x,y,ca)
-				elseif ddcs then pix(x,y,cd)
+				if sj[i]==1 and not ui.mouse_on_ui then pix(i-1,y,cs)
+				elseif cj[i]==1 then pix(i-1,y,ca)
 				end
 			end
 		end
-		if not tl.is_drawing and not mouse_on_ui then
+		if not tl.drawing and not ui.mouse_on_ui and tl.type~="pattern" then
+			pix(g_mx-1,g_my-1,cs)
+		end
+	end
+
+	local function render_rects_trippy()
+		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[sel],cells[cur],CS-pad,thm.cell,(eraser and thm.erase or thm.select)
+		for j=1,GH do
+			y=(j-1)*CS+pad
+			sj,cj=s[j],c[j]
+			for i=1,GW do
+				x=(i-1)*CS+pad
+				if sj[i]==1 and not ui.mouse_on_ui then rect(x,y,rs,rs,cs)
+				elseif cj[i]==1 then rect(x,y,rs,rs,rand(0,15))
+				end
+			end
+		end
+		if not tl.drawing and not ui.mouse_on_ui then
+			rect((g_mx-1)*CS+pad,(g_my-1)*CS+pad,CS-pad,CS-pad,cs)
+		end
+	end
+
+	local function render_pix_trippy()
+		local pix,s,c,ca,cs,sj,cj,y=pix,cells[sel],cells[cur],thm.cell,(eraser and thm.erase or thm.select)
+		for j=1,GH do
+			y,sj,cj=j-1,s[j],c[j]
+			for i=1,GW do
+				if sj[i]==1 and not ui.mouse_on_ui then pix(i-1,y,cs)
+				elseif cj[i]==1 then pix(i-1,y,rand(0,15))
+				end
+			end
+		end
+		if not tl.drawing and not ui.mouse_on_ui and tl.type~="pattern" then
 			pix(g_mx-1,g_my-1,cs)
 		end
 	end
 
 	local function render_ui()
 	bma("ui_render",function()--@bm
-		tc.draw()
+		if cur_scr == GAME_SCR and info_vis then
+			GenInfo()
+		end
 	end)--@bm
 	end
 
@@ -1472,48 +1976,96 @@ local tl,ui,rand_cells
 	end
 
 	local function draw_help()
-		printc("Help ".. cur_scr-1 .."/"..num_help_scrs, nil, 0 , cols.header)
-		printc("H >>  ", nil, 16, cols.header, false)
-		if cur_scr == HELP_SCR1 then
-			prints("Screen ", 1, 1, cols.header)
-			prints(help_strs.hstr1:gsub('\t', ''), 0, 2, cols.text, true)
+		cls(0)
+		local tc,hc,sc=thm.text,thm.header,thm.shad
+		printgsc("Help "..cur_scr-1 .."/"..NUM_HELP_SCRS,_,0,hc)
+		printgsc("H >>",_,16,hc,false)
+		if cur_scr==HELP_SCR1 then
+			printgsc("Screen",1,1,hc)
+			printgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,true)
 			spr(256,2*8,5*8+5,0,1,0,0,8,5)
-		elseif cur_scr == HELP_SCR2 then
-			prints("Controls ", 1, 1, cols.header)
-			prints(help_strs.hstr2:gsub('\t', ''), 2, 2, cols.text, true)
-			prints("Mouse editing ", 1, 12, cols.header)
-			prints(help_strs.hstr3:gsub('\t', ''), 2, 13, cols.text, true)
-		elseif cur_scr == HELP_SCR3 then
-			prints("Tools ", 1, 1, cols.header)
-			prints(help_strs.hstr4:gsub('\t', ''), 2, 2, cols.text, true)
-			prints("Tool modes ", 1, 7, cols.header)
-			prints(help_strs.hstr5:gsub('\t', ''), 2, 8, cols.text, true)
-		elseif cur_scr == HELP_SCR4 then
-			prints("Pattern Categories ", 1, 2, cols.header)
-			prints(help_strs.hstr6:gsub('\t', ''), 2, 3, cols.text, true)
+		elseif cur_scr==HELP_SCR2 then
+			printgsc("Controls",1,1,hc)
+			printgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,true)
+			printgsc("Mouse editing",1,12,hc)
+			printgs(help_strs[3]:gsub('\t',''),2,13,tc,sc,true)
+		elseif cur_scr==HELP_SCR3 then
+			printgsc("Tools",1,1,hc)
+			printgs(help_strs[4]:gsub('\t',''),2,2,tc,sc,true)
+			printgsc("Tool modes",1,7,hc)
+			printgs(help_strs[5]:gsub('\t',''),2,8,tc,sc,true)
+		elseif cur_scr==HELP_SCR4 then
+			printgsc("Pattern Categories",1,2,hc)
+			printgs(help_strs[6]:gsub('\t',''),2,3,tc,sc,true)
 		end
 	end
 
 	local function draw_options()
-		printc("Options", nil, 0 , cols.header)
-		prints("Game", 1, 2, cols.header)
-		prints("Startup", 1, 9, cols.header)
+		cls(1)
+		local tc,hc,lbt,oc,c=thm.text,thm.header,{shadow=1},cell_col
+		printgsc("Options ",_,1,hc)
+		printgsc("O >>",_,16,hc,false)
+
+		for i=1,#opts-1 do
+			Switch("s"..i,16,32+8*(i-1),opts[i],function(t)
+				if t.switched then toggle_opt(i)end
+			end)
+		end
+
+		Label("l1",34,32+1,"use cell padding",tc,lbt)
+		Label("l2",34,40+1,"wrap around edges",tc,lbt)
+		Label("l3",34,48+1,"randomize at startup",tc,lbt)
+		Label("l4",34,56+1,"reset on randomize",tc,lbt)
+
+		Spinbox("sp1",16,72,opts[ZOOM_LVL],1,4,1,function(t)
+			if t.val_changed then set_zoom(t.val,true)end
+		end)
+		Label("l4",40,72+1,"zoom level",tc,lbt)
+
+		local c=CellColorPicker("cp",48,100,oc)
+		if c[1]~=oc[1] or c[2]~=oc[2] or c[3]~=oc[3] then
+			set_cell_color(c)
+		end
+
 		render_ui()
 	end
 
 	local function render()
 	bma("render",function()--@bm
-		cls(cols.bg)
-		if cur_scr < HELP_SCR1 then
-			draw_game()
-		elseif cur_scr < OPTS_SCR then
-			draw_help()
-		else
-			draw_options()
+		cls(thm.bg)
+		if     cur_scr < HELP_SCR1 then draw_game()
+		elseif cur_scr < OPTS_SCR then draw_help()
+		else draw_options()
 		end
 	end)--@bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
+
+function inc_color()
+	local i=PALM+8*3
+	local r,g,b=
+		wrap(peek(i  )-1,0,255),
+		wrap(peek(i+1)-1,0,255),
+		wrap(peek(i+2)-1,0,255)
+
+	set_cell_color({r,g,b})
+	-- poke(i,r)
+	-- poke(i+1,g)
+	-- poke(i+2,b)
+end
+
+function dec_color()
+	local i=PALM+8*3
+		local r,g,b=
+		wrap(peek(i  )+1,0,255),
+		wrap(peek(i+1)+1,0,255),
+		wrap(peek(i+2)+1,0,255)
+
+	set_cell_color({r,g,b})
+	-- poke(i,r)
+	-- poke(i+1,g)
+	-- poke(i+2,b)
+end
 
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
@@ -1527,96 +2079,101 @@ local tl,ui,rand_cells
 			elseif cur_scr >= HELP_SCR1 then
 				if keyp() or mbtnp() then toggle_help() end
 			else
-				ct_mod = key(k.CTRL)
-				sh_mod = key(k.SHFT)
-				al_mod = key(k.ALT)
+				ctrl = key(k.CTRL)
+				shift = key(k.SHFT)
+				alt = key(k.ALT)
 
-				tl.mode1 = ct_mod
-				tl.mode2 = sh_mod
-				tl.mode3 = al_mod
+				tl.mode1 = ctrl
+				tl.mode2 = shift
+				tl.mode3 = alt
 
-				if keyp(k.SPACE)                    then
-					if sh_mod then pause(true)
-					else toggle_pause()
-					end
-				elseif keyp(k.G, 10, 5)             then if paused then next_gen() end
-				elseif keyp(k.ENTER)                then rand_cells(opts[rand_reset])
-				elseif keyp(k.PGUP)                 then set_zoom(-1)
-				elseif keyp(k.PGDN)                 then set_zoom(1)
+				if     keyp(k.SPACE)                then if shift then pause(true) else toggle_pause() end
+				elseif keyp(k.G,10,5)               then if paused then next_gen() end
+				elseif keyp(k.ENTER)                then rand_cells(opts[RAND_RESET])
+				elseif keyp(k.PGUP)                 then dec_zoom()
+				elseif keyp(k.PGDN)                 then inc_zoom()
+
+				elseif shift and key(k.UP)          then inc_speed()
+				elseif shift and key(k.DOWN)        then dec_speed()
+				elseif keyp(k.UP)                   then inc_speed()
+				elseif keyp(k.DOWN)                 then dec_speed()
+				elseif key(k.LEFT)                  then inc_color()
+				elseif key(k.RIGHT)                 then dec_color()
 
 				elseif keyp(k.O)                    then toggle_options()
 				elseif keyp(k.H)                    then toggle_help()
-				elseif keyp(k.P)                    then ui.cbx_pad:toggle_state()
-				elseif keyp(k.K)                    then ui.cbx_deadc:toggle_state()
+				-- elseif keyp(k.P)                    then ui.cbx_pad:toggle_state()
 
 				elseif keyp(k.TAB)                  then toggle_ui()
-				elseif keyp(k.I)                    then toggle_ibar()
-				elseif keyp(k.T)                    then toggle_topbar()
-
+				elseif keyp(k.I)                    then toggle_info()
 				elseif keyp(k.E)                    then toggle_eraser()
-				elseif keyp(k.V)
-				or     keyp(k.N1)                   then if tl.type ~= "brush" then ui.tlbar.tls["brush"]:toggle_state() end
-				elseif keyp(k.U)                    then ui.tlbar_handle:reset()
-				elseif keyp(k.L)                    then if tl.type ~= "line" then ui.tlbar.tls["line"]:toggle_state() end
-				elseif keyp(k.R)                    then if tl.type ~= "rect" then ui.tlbar.tls["rect"]:toggle_state() end
-				elseif keyp(k.C) and     sh_mod     then fill_grid(false)
-				elseif keyp(k.C) and not sh_mod     then if tl.type ~= "circle" then ui.tlbar.tls["circle"]:toggle_state() end
-				elseif keyp(k.F) and     sh_mod     then fill_grid(true)
-				elseif keyp(k.F) and not sh_mod     then if tl.type ~= "fill" then ui.tlbar.tls["fill"]:toggle_state() end
+				elseif keyp(k.D)or keyp(k.B)or keyp(k.N1)then tl:switch("brush")
+				-- elseif keyp(k.U)                    then ui.tlbar_handle:reset()
+				elseif keyp(k.L)                    then tl:switch("line")
+				elseif keyp(k.R)                    then tl:switch("rect")
+				elseif keyp(k.C) and     shift      then fill_grid(false)
+				elseif keyp(k.C) and not shift      then tl:switch("circle")
+				elseif keyp(k.F) and     shift      then fill_grid(true)
+				elseif keyp(k.F) and not shift      then tl:switch("fill")
 				elseif keyp(k.W, 10, 5) then
-					if     tl.type == "brush"   then tl.expand()
-					elseif tl.type == "pattern" then tl.next_pattern()
+					if     tl.type == "brush"   then tl:expand()
+					elseif tl.type == "pattern" then tl:next_pattern()
 					end
 				elseif keyp(k.S, 10, 5) then
-					if     tl.type == "brush"   then tl.contract()
-					elseif tl.type == "pattern" then tl.prev_pattern()
+					if     tl.type == "brush"   then tl:contract()
+					elseif tl.type == "pattern" then tl:prev_pattern()
 					end
 				elseif keyp(k.N2) then
-					if tl.type ~= "pattern" then ui.tlbar.tls["pattern"]:toggle_state() end
-					tl.set_category(1)
+					tl:switch("pattern")
+					tl:set_category(1)
 				elseif keyp(k.N3) then
-					if tl.type ~= "pattern" then ui.tlbar.tls["pattern"]:toggle_state() end
-					tl.set_category(2)
+					tl:switch("pattern")
+					tl:set_category(2)
 				elseif keyp(k.N4) then
-					if tl.type ~= "pattern" then ui.tlbar.tls["pattern"]:toggle_state() end
-					tl.set_category(3)
+					tl:switch("pattern")
+					tl:set_category(3)
 				elseif keyp(k.N5) then
-					if tl.type ~= "pattern" then ui.tlbar.tls["pattern"]:toggle_state() end
-					tl.set_category(4)
+					tl:switch("pattern")
+					tl:set_category(4)
 				elseif keyp(k.N6) then
-					if tl.type ~= "pattern" then ui.tlbar.tls["pattern"]:toggle_state() end
-					tl.set_category(5)
+					tl:switch("pattern")
+					tl:set_category(5)
 				end
 			end
 		end
 	end
 
 	local function handle_mouse()
-		update_mst()
-		g_mx = mx//CS+1
-		g_my = my//CS+1
+		g_mx,g_my=mx//CS+1,my//CS+1
+		g_lmx,g_lmy=lmx//CS+1,lmy//CS+1
 
-		if cur_scr == GAME_SCR and not mouse_on_ui then
+		if cur_scr == GAME_SCR and not ui.mouse_on_ui then
 			if mbtnp(M2) then
-				tl.cancel()
+				tl:cancel()
 			else
-				if tl.type == "brush" then
-					if     mbtn(M1) then tl.commit(not eraser)
-					elseif mbtn(M2) then tl.commit(false)
+				if tl.type=="brush" then
+					if     mbtn(M1) then
+						tl:start()
+						tl:commit(not eraser)
+					elseif mbtn(M2) then
+						tl:start()
+						tl:commit(false)
+					elseif mbtnr(M1) then tl:stop()
+					elseif mbtnr(M2) then tl:stop()
 					end
 				elseif mbtnp(M1) then
 					if tl.type == "line" then
-						if tl.is_drawing then tl.commit(not eraser) end
-						tl.start(g_mx, g_my)
-					elseif (tl.type == "fill" or tl.type == "pattern") or tl.is_drawing then
-						tl.commit(not eraser)
-						tl.cancel()
+						if tl.drawing then tl:commit(not eraser) end
+						tl:start(g_mx, g_my)
+					elseif (tl.type == "fill" or tl.type == "pattern") or tl.drawing then
+						tl:commit(not eraser)
+						tl:cancel()
 					else
-						tl.toggle(g_mx, g_my)
+						tl:toggle(g_mx, g_my)
 					end
 				elseif mbtnp(M3) then
-					tl.commit(false)
-					tl.cancel()
+					tl:commit(false)
+					tl:cancel()
 				end
 			end
 		end
@@ -1624,7 +2181,9 @@ local tl,ui,rand_cells
 
 	local function input()
 	bma("input",function()--@bm
-		handle_mouse()
+		if not ui.mouse_on_ui then
+			handle_mouse()
+		end
 		handle_keys()
 	end)--@bm
 	end
@@ -1633,111 +2192,63 @@ local tl,ui,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Unsorted stuff
+
+	function inc_speed()
+		upd_delay=clamp(upd_delay-1,0,100)
+	end
+
+	function dec_speed()
+		upd_delay=clamp(upd_delay+1,0,100)
+	end
+
 	function toggle_ui()
-		if ui_vis then
-			if not anim:is_playing() then
-				anim:add_anim("tlbar_show", ui.tlbar_handle, ui.tlbar_handle.x, ui.tlbar_handle.y)
-				anim:play("tlbar_hide")
-				anim:play("ibar_hide")
-				anim:play("topbar_hide")
-				ui_vis = false
-			end
-		else
-			if not anim:is_playing() then
-				anim:play("tlbar_show")
-				anim:play("ibar_show")
-				anim:play("topbar_show")
-				ui_vis = true
-			end
-		end
+		ui.visible=not ui.visible
 	end
 
 	function toggle_help()
 		if cur_scr == GAME_SCR then
 			cur_scr = HELP_SCR1
 		else
-			cur_scr = wrap(cur_scr+1, 1, num_help_scrs+1)--%(num_help_scrs+1)
+			cur_scr = wrap(cur_scr+1, 1, NUM_HELP_SCRS+1)--%(NUM_HELP_SCRS+1)
 		end
 	end
 
 	function toggle_options()
-		-- init_options
 		if cur_scr == GAME_SCR then
 			cur_scr = OPTS_SCR
-
-			ui.grp_ui:disable()
-			ui.grp_opts:enable()
 		else
 			cur_scr = GAME_SCR
-			ui.grp_ui:enable()
-			ui.grp_opts:disable()
-			_hacky_fix()
-		end
-	end
-
-	function _hacky_fix()
-		-- fixes for btn problems when enabling the ui after leaving options screen
-		local tltype = tl.type
-		tl.switch("brush") -- fix rect mod btns showing when using circle
-		tl.switch(tltype)
-		if stopped then -- fix pause btn showing over play btn when stopped
-			-- ui.btn_stop:turn_on()
-			ui.btn_play:turn_off()
-			ui.btn_play:enable()
-
-			ui.btn_pause:turn_off()
-			ui.btn_pause:disable()
-		elseif paused then
-			unpause()
-			pause()
-		else
-			pause()
-			unpause()
-		end
-	end
-
-	function toggle_pause()
-		if paused then
-			unpause()
-		else
-			pause()
 		end
 	end
 
 	function unpause()
 		if paused then
 			stopped=false
-			paused = false
-			ui.btn_stop:turn_off()
-			ui.btn_play:turn_on()
-			ui.btn_play:disable()
-			ui.btn_pause:enable()
+			paused=false
 		end
 	end
 
 	function pause(restart)
 		if not paused or restart then
 			paused = true
-			if restart then
-				reset()
-			else
-				ui.btn_pause:turn_off()
-				ui.btn_pause:disable()
-				ui.btn_play:enable()
-			end
+			if restart then reset()end
 		end
+	end
+
+	function toggle_pause()
+		if paused then unpause()
+		else pause()
+		end
+	end
+
+	function toggle_eraser()
+		eraser = not eraser
 	end
 
 	function reset()
 		gens = 0
 		fill_grid(false)
 		stopped=true
-		ui.btn_stop:turn_on()
-		ui.btn_play:turn_off()
-		ui.btn_play:enable()
-
-		ui.btn_pause:turn_off()
-		ui.btn_pause:disable()
 	end
 
 	function set_speed(dir)
@@ -1747,19 +2258,28 @@ local tl,ui,rand_cells
 
 
 function TIC()
-	local t_new = time()/1000
-	local dt = t_new-t_old
-	t_old = t_new
-	monitor("dt: ", fmt("%.2f",dt*1000))
-	monitor("fps: ", fmt("%d",1//dt))
+bma("whole",function()--@bm
 
+	tm_check()
+	update_mst()
+
+	monitor("dt", fmt("%.3f",dt), 11)
+	monitor("fps", fmt("%d",1//dt), 11)
+
+	ui.start_frame()
+	update_ui()
 	input()
-	update(dt)
+	update()
 	render()
+	monitor("mouse_ui", ui.mouse_on_ui,11)
+	ui.end_frame()
 
-	-- bma("render_dbg",function()--@bm
+	-- local i=PALM+8*3
+	-- local r,g,b=peek(i),peek(i+1),peek(i+2)
+	-- monitor("col", "("..r..","..g..","..b..")",8)
+
 		dbg:draw()
-	-- end)--@bm
+end)--@bm
 end
 
 
