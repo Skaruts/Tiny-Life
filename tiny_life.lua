@@ -1443,6 +1443,7 @@ local tl,rand_cells
 				end
 			end
 		end
+		if opts[WRAP_AROUND] then swap_borders(c) end
 	end
 
 	function tl.clear(t)
@@ -1793,16 +1794,20 @@ local tl,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- update
-
+	function swap_borders(c)
+		c[GH+1],c[0]=c[1],c[GH]
+		for j=1,GH do
+			c[j][GW+1],c[j][0]=c[j][1],c[j][GW]
+		end
+	end
+	-- the weirdness in here seems to have given me over 10ms and 20fps
 	local function compute_gen()
 		cur,pre=pre,cur
-		-- the weirdness in here got me over 10ms and 20fps
 		local lc,p,c=0,cells[pre],cells[cur]	-- count alive cells, and make buffers local
 		local l,r,n,b,cj,pj,pu,pd -- this seems to give me ~2ms (and more token budget)
 
 		for j=1,GH do
-			-- make buffer rows local here for faster access
-			cj,pj,pu,pd=c[j],p[j],p[j-1],p[j+1]
+			cj,pj,pu,pd=c[j],p[j],p[j-1],p[j+1] -- make buffer rows local here for faster access
 			for i=1,GW do
 				l,r=i-1,i+1
 				-- count alive neighbors
@@ -1815,15 +1820,9 @@ local tl,rand_cells
 		end
 
 		if opts[WRAP_AROUND] then  -- swap borders
-			for i=0,GW-1 do
-				c[GH+1][i],c[0][i]=c[1][i],c[GH][i]
-			end
-			for j=1,GH do
-				c[j][GW+1],c[j][0]=c[j][1],c[j][GW]
-			end
+			swap_borders(c)
 		end
-		l_cells=lc
-		gens=gens+1
+		l_cells,gens=lc,gens+1
 	end
 
 	local function update_ui()
@@ -2001,6 +2000,7 @@ local tl,rand_cells
 	local function render()
 	bma("render",function()--@bm
 		cls(thm.bg)
+		-- cls(2)
 		if     cur_scr < HELP_SCR1 then draw_game()
 		elseif cur_scr < OPTS_SCR then draw_help()
 		else draw_options()
