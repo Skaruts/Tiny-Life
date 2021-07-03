@@ -1061,6 +1061,8 @@ local tl,rand_cells
 
 			-- printo("Speed:"..(100-upd_delay),2,ty+16,tc,oc,_,_,true)
 			printo("Speed:"..1-(1*(upd_delay/100)),2,ty+16,tc,oc,_,_,true)
+			-- printo("Zoom:"..opts[ZOOM_LVL],240-23,ty+8*16-1,tc,oc,_,_,true)
+			printo(fmt("%s | %s, %s", opts[ZOOM_LVL],g_mx-1,g_my-1),2,ty+8*16-1,tc,oc,_,_,true)
 		end
 	end
 
@@ -2078,8 +2080,8 @@ end
 				if     keyp(k.SPACE)                then if shift then pause(true) else toggle_pause() end
 				elseif keyp(k.G,10,5)               then if paused then compute_gen() end
 				elseif keyp(k.ENTER)                then rand_cells(opts[RAND_RESET])
-				elseif keyp(k.PGUP)                 then dec_zoom()
-				elseif keyp(k.PGDN)                 then inc_zoom()
+				elseif keyp(k.PGUP)                 then inc_zoom()
+				elseif keyp(k.PGDN)                 then dec_zoom()
 
 				elseif shift and key(k.UP)          then inc_speed()
 				elseif shift and key(k.DOWN)        then dec_speed()
