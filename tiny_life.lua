@@ -44,7 +44,7 @@
 			line(240/2,0,240/2,136,c)
 			line(0,136/2,240,136/2,c)
 		end
-
+	--[[ sdist - distance squared              001 ]] local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
 	--[[ tm_check - time stuff / dt            003 ]]
 		-- call 'tsecs' without args to get current time in secs
 		-- call 'tm_check' at the start of every frame to update t/dt/t2
@@ -79,7 +79,6 @@
 			print(t,x,y,c,fw,s)
 		end
 	--[[ printgsc - print grid/shadow/centered 010 ]] local function printgsc(tx,x,y,c,sc,fw,s) fw,s,sc=fw or false,s or 1,sc or 1 if not x then x=(240//8)//2-(txtw(tx)//8)//2 end if not y then y=(136//8)//2 end print(tx,x*8+1,y*8+1,sc,fw,s) print(tx,x*8,y*8,c,fw,s) end
-	--[[ Print grid w/ drop shadow centered  (0.07) ]] local function printc(t,x,y,c,fix_w)local xc,yc,c,len=1,1,c or 15,print(t,-999,-999)x=x==nil and(240-len)//2or x*8 y=y==nil and 136//2-8//2or y*8 print(t,x+xc+1,y+yc+1,shad_c,fix_w)print(t,x+xc,y+yc,c,fix_w)end
 	--[[ printgo - print grid/outline          001 ]]
 		local function printgo(tx,x,y,c,oc)
 			x,y=x*8,y*8
@@ -1227,6 +1226,8 @@ local tl,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Animation Player
+	-- TODO: NOT BEING USED WITH THEN EW UI
+
 	-- Really simple/naive animation player. Only animates
 	-- positions. Only used for the UI.
 	-- Probably overkill, but I didn't know any better.
@@ -1287,8 +1288,8 @@ local tl,rand_cells
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Flood Fill
 	-- TODO: revise this
-	local function _has_pix(v,x,y,s,c,elipse)
-		if elipse then
+	local function _has_pix(v,x,y,s,c,tmp)
+		if tmp then
 			return x<1 or y<1 or x>GW or y>GH
 			or s[y][x]==1
 		else
@@ -1297,52 +1298,60 @@ local tl,rand_cells
 		end
 	end
 
-	--   Scanline FT
-	local function scnln_ft(x, y, ellipse,v)
-		local pts={}
-		ins(pts,vec2(x,y)) -- add the initial point
 
-		local s,c,tidx,pt,set_abv,set_blw,sy=cells[sel],cells[cur],#pts
+	--   Scanline FT
+	local function scnln_ft(x, y, tmp,v)
+		local pts={}
+		local function _p(x,y)
+			if not x then
+				local p=pts[#pts]
+				pts[#pts]=nil
+				return p
+			end
+			pts[#pts+1]={x=x,y=y}
+		end
+
+		_p(x,y) -- add the initial point
+
+		local s,c,pt,set_abv,set_blw,sy=cells[sel],cells[cur]
 		repeat
-			pt = rem(pts)
+			pt = _p()
 			set_abv,set_blw,sy,x=true,true,s[pt.y],pt.x
-			while not _has_pix(v,x,pt.y,s,c,ellipse)do
+			while not _has_pix(v,x,pt.y,s,c,tmp)do
 				sy[x]=1
-				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
+				if _has_pix(v,x,pt.y-1,s,c,tmp)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then ins(pts,vec2(x,pt.y-1))end
+					if not set_abv then _p(x,pt.y-1)end
 				end
-				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
+				if _has_pix(v,x,pt.y+1,s,c,tmp)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then ins(pts,vec2(x,pt.y+1))end
+					if not set_blw then _p(x,pt.y+1)end
 				end
 				x=x+1
 			end
-			set_abv=pt.y>0 and _has_pix(v,pt.x,pt.y-1,s,c,ellipse)
-			set_blw=pt.y<GH-1 and _has_pix(v,pt.x,pt.y+1,s,c,ellipse)
+			set_abv=pt.y>0 and _has_pix(v,pt.x,pt.y-1,s,c,tmp)
+			set_blw=pt.y<GH-1 and _has_pix(v,pt.x,pt.y+1,s,c,tmp)
 			x=pt.x-1
-			while not _has_pix(v,x,pt.y,s,c,ellipse)do
+			while not _has_pix(v,x,pt.y,s,c,tmp)do
 				sy[x]=1
-				if _has_pix(v,x,pt.y-1,s,c,ellipse)~=set_abv then
+				if _has_pix(v,x,pt.y-1,s,c,tmp)~=set_abv then
 					set_abv=not set_abv
-					if not set_abv then ins(pts,vec2(x,pt.y-1))end
+					if not set_abv then _p(x,pt.y-1)end
 				end
-				if _has_pix(v,x,pt.y+1,s,c,ellipse)~=set_blw then
+				if _has_pix(v,x,pt.y+1,s,c,tmp)~=set_blw then
 					set_blw=not set_blw
-					if not set_blw then ins(pts,vec2(x,pt.y+1))end
+					if not set_blw then _p(x,pt.y+1)end
 				end
 				x=x-1
 			end
 		until #pts==0
 	end
 
-	local function flood_fill(x,y,ellipse)
-		elipse=elipse or false
-		scnln_ft(x,y,ellipse,eraser and 0 or 1)
+	local function flood_fill(x,y,tmp)
+		scnln_ft(x,y,tmp or false,eraser and 0 or 1)
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
-	--[[ sdist - distance squared              001 ]]
-		local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
+
 	--[[ Bounds checking                       003 ]]
 		local function inbounds(x,y)
 			return x>0 and x<=GW and y>0 and y<=GH
@@ -1409,10 +1418,12 @@ local tl,rand_cells
 		cur_pats={},
 		cur_cat=1,
 		cur_pat=1,
+		do_update=false,
 	}
 	function tl.start(t,x, y)
 		t.orgn = vec2(x, y)
 		t.drawing = true
+		t.do_update=true
 	end
 
 	function tl.stop(t)
@@ -1460,7 +1471,13 @@ local tl,rand_cells
 		if t.type~=tp or force then
 			t:cancel()
 			t.type = tp
+			t.do_update=true
 		end
+	end
+
+	function tl.set_modes(c,s,a)
+		if tl.mode1~=c or tl.mode2~=s or tl.mode3~=a then tl.do_update=true end
+		tl.mode1,tl.mode2,tl.mode3=c,s,a
 	end
 
 	function tl.expand(t)
@@ -1583,12 +1600,17 @@ local tl,rand_cells
 	}
 
 	function tl.draw_points(t,x, y)
-		t._draw_fns[t.type](t,x, y)
+		if t.do_update then
+			tl:clear()
+			t._draw_fns[t.type](t,x, y)
+			t.do_update=false
+		end
 	end
 
 	function tl._set_size(t)
 		t.w = t.cats[t.cur_cat][t.cur_pat].w
 		t.h = t.cats[t.cur_cat][t.cur_pat].h
+		tl.do_update=true
 	end
 
 	function tl.set_category(t,c)
@@ -1784,10 +1806,6 @@ local tl,rand_cells
 		if opts[RAND_START] then rand_cells() end
 
 		anim = Animator()
-
-		-- init_ui()
-
-		-- ui.tlbar.tls["brush"]:toggle_state()
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1836,11 +1854,15 @@ local tl,rand_cells
 
 	local function update()
 	bma("update",function()--@bm
-		if cur_scr == GAME_SCR then
+		if cur_scr==GAME_SCR then
 			-- if use_ibar then ui.lbl_nfo:set_text("") end
 
 			if not ui.mouse_on_ui then
-				tl:clear()
+
+				if mmoved() then
+					-- tl:clear()
+					tl.do_update = true
+				end
 				tl:draw_points(g_mx,g_my)
 			end
 			-- ui.lbl_mouse:set_text(opts[ZOOM_LVL].." | "..g_mx..", "..g_my)
@@ -1849,7 +1871,7 @@ local tl,rand_cells
 				if not paused and (upd_delay==0 or f%upd_delay==0) then
 					compute_gen()
 				end
-			end)--@bm
+			end) --@bm
 
 			anim:update()
 			-- update_ui()
@@ -2051,9 +2073,7 @@ end
 				shift = key(k.SHFT)
 				alt = key(k.ALT)
 
-				tl.mode1 = ctrl
-				tl.mode2 = shift
-				tl.mode3 = alt
+				tl.set_modes(ctrl,shift,alt)
 
 				if     keyp(k.SPACE)                then if shift then pause(true) else toggle_pause() end
 				elseif keyp(k.G,10,5)               then if paused then compute_gen() end
