@@ -884,7 +884,7 @@
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 	local zoom_mults={8,4,2,1}
-	local pad,anim=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
+	local pad=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
 	local paused,stopped=true,true
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
 	local NUM_HELP_SCRS,state=4,"game"
@@ -1630,7 +1630,7 @@ local tl,rand_cells
 				while i<i+4 do -- inf loop guard
 					i=i+1
 					nex=str:sub(i,i)
-					if nex=="."or nex=="o" then break end
+					if nex=="."or nex=="o"then break end
 					s=s..nex
 				end
 				return tonum(s),i
@@ -1785,8 +1785,6 @@ local tl,rand_cells
 		-- create_cells()
 		set_zoom(pmem(ZOOM_LVL),false,true)
 		if opts[RAND_START] then rand_cells() end
-
-		anim = Animator()
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1848,10 +1846,6 @@ local tl,rand_cells
 					compute_gen()
 				end
 			end) --@bm
-
-			anim:update()
-		-- elseif state=="options"then
-		-- 	-- update_ui()
 		end
 	end)--@bm
 	end
