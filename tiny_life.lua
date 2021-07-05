@@ -885,7 +885,7 @@
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 	local zoom_mults={8,4,2,1}
 	local pad,anim=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
-	local paused,stopped,trippy=true,true,false
+	local paused,stopped=true,true
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
 	local NUM_HELP_SCRS,state=4,"game"
 
@@ -1046,15 +1046,15 @@ local tl,rand_cells
 			local ty,tc,oc,cstr,tcstr,tstr=2,thm.text,thm.outl,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
 			printo("Gen: "..gens,2,ty,tc,oc,_,_,true)
 
-			printo("C:"..rep(' ',6-#cstr)..cstr
+			ty=ty+8*16-1
+			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,_,_,true)
+			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),40,ty,tc,oc,_,_,true)
+			printo("Speed:"..1-(1*(upd_delay/100)),70,ty,tc,oc,_,_,true)
+
+			printo("Cells:"..rep(' ',6-#cstr)..cstr
 			     .."|"..rep(' ',6-#tcstr)..tcstr
 			     .."/"..rep(' ',6-#tstr)..tstr
-				,2,ty+8,tc,oc,false,_,true)
-
-			-- printo("Speed:"..(100-upd_delay),2,ty+16,tc,oc,_,_,true)
-			printo("Speed:"..1-(1*(upd_delay/100)),2,ty+16,tc,oc,_,_,true)
-			-- printo("Zoom:"..opts[ZOOM_LVL],240-23,ty+8*16-1,tc,oc,_,_,true)
-			printo(fmt("%s | %s, %s", opts[ZOOM_LVL],g_mx-1,g_my-1),2,ty+8*16-1,tc,oc,_,_,true)
+				,140,ty,tc,oc,false,_,true)
 		end
 	end
 
