@@ -865,11 +865,7 @@
 		if pmem(ZOOM_LVL)==0 then pmem(ZOOM_LVL, opts[ZOOM_LVL]) end
 
 		local mr,mg,mb=pmem(CC_R),pmem(CC_G),pmem(CC_B)
-		-- tracec(mr,mg,mb)
-		-- if mr~=r or mg~=g or mb~=b then
-			set_cell_color({mr,mg,mb})
-		-- end
-		-- trace1d(cell_col)
+		set_cell_color({mr,mg,mb})
 	end
 
 	function toggle_opt(i) -- toggle value of an option and save it
@@ -884,19 +880,15 @@
 	local g_mx,g_my,g_lmx,g_lmy=0,0,0,0 -- grid mouse pos
 	local ctrl,shift,alt=false,false,false
 
-	local pre,cur,sel=1,2,3 -- prev/curr/ghost buffer indices
+	local pre,cur,dum=1,2,3 -- prev/curr/dummy buffer indices
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 	local zoom_mults={8,4,2,1}
 	local pad,anim=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
-	local paused,stopped,eraser,trippy=true,true,false,false
+	local paused,stopped,trippy=true,true,false
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
-	local GAME_SCR,HELP_SCR1,HELP_SCR2,HELP_SCR3,HELP_SCR4,OPTS_SCR=1,2,3,4,5,10 -- game screens
-	local NUM_HELP_SCRS,cur_scr=4,GAME_SCR
+	local NUM_HELP_SCRS,state=4,"game"
 
-	-- http://www.mirekw.com/ca/ca_files_formats.html
-
-	-- local STATICS,OSCILATORS,EXPLOSIVE,GLIDERS,GUNS=1,2,3,4,5
 	local cats={
 		"Statics",
 		"Oscilators",
@@ -952,7 +944,6 @@
 			F         Fill tool
 		]],
 		[[
-			E         Toggle eraser mode
 			SHIFT     Proportional rect/circle
 			CTRL      Filled rect/circle
 			ALT       Centered rect/circle
@@ -974,8 +965,8 @@ local tl,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
-	local pb_rect={x=240//2-76//2,y=-2,            w=76,h=10}
-	local tb_rect={x=-2,          y=136//2-80//2,  w=10,h=80}
+	local pb_rect={x=240//2-76//2,  y=-2,            w=76,  h=10}
+	local tb_rect={x=-2,            y=136//2-104//2,  w=10,  h=104}
 	local thm={
 		bg=0,
 		fg=13,
@@ -984,7 +975,8 @@ local tl,rand_cells
 		outl=1,
 		header=9,
 		cell=8,
-		select=11,
+		preview=11,
+		select=14,
 		erase=7,
 		dim_text=14,
 		btn={
@@ -1120,30 +1112,41 @@ local tl,rand_cells
 	function Toolbar(id,r,op)
 		ui.with_item("tb",r.x,r.y,r.w,r.h,op,function(t)
 			ui.nframe(r.x,r.y,r.w,r.h,3)
-			local ttp,b1,b2,b3,b4,b5,b6=tl.type
-			b1=Button("b_brush",1,1, 112+(ttp~="brush"and 0 or(eraser and 4 or 2)))
-			b2=Button("b_rect", 1,9, 128+(ttp~="rect"and 0 or(eraser and 4 or 2)))
-			b3=Button("b_circ", 1,17,144+(ttp~="circle"and 0 or(eraser and 4 or 2)))
-			b4=Button("b_line", 1,25,160+(ttp~="line"and 0 or(eraser and 4 or 2)))
-			b5=Button("b_fill", 1,33,176+(ttp~="fill"and 0 or(eraser and 4 or 2)))
-			b6=Button("b_patt", 1,41,192+(ttp~="pattern"and 0 or(eraser and 4 or 2)))
+			local ttp,cb,brt,b1,b2,b3,b4,b5,b6,b7,b8,b9=tl.type,#tl.clipboard>0,tl.brush_type
+			b1=Button("b_brush",1, 1,112+(ttp=="brush"and 2 or 0))
+			b2=Button("b_rect", 1, 9,128+(ttp=="rect"and 2 or 0))
+			b3=Button("b_circ", 1,17,144+(ttp=="circ"and 2 or 0))
+			b4=Button("b_line", 1,25,160+(ttp=="line"and 2 or 0))
+			b5=Button("b_fill", 1,33,176+(ttp=="fill"and 2 or 0))
+			b6=Button("b_patt", 1,41,192+(ttp=="patt"and 2 or 0))
+			b7=Button("b_copy", 1,49,136+(ttp=="copy"and 2 or 0))
+			b8=Button("b_cut",  1,57,152+(ttp=="cut"and 2 or 0))
+			ui.with_active(cb,function()
+				b9=Button("b_paste",1,65,cb and (168+(ttp=="paste" and 2 or 0))or 169)
+			end)
 			if b1.released then tl:switch("brush")end
 			if b2.released then tl:switch("rect")end
-			if b3.released then tl:switch("circle")end
+			if b3.released then tl:switch("circ")end
 			if b4.released then tl:switch("line")end
 			if b5.released then tl:switch("fill")end
-			if b6.released then tl:switch("pattern")end
+			if b6.released then tl:switch("patt")end
+			if b7.released then tl:switch("copy")end
+			if b8.released then tl:switch("cut")end
+			if b9.released then tl:switch("paste")end
 
-			ui.spr(4,t.gx+1,t.gy+49,0)
+			ui.spr(4,t.gx+1,t.gy+72,0)
 
-			if tl.type=="rect"then
-				ui.spr(shift and 119 or 118,t.gx+1,t.gy+56,0)
-				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+63,0)
-				ui.spr(alt and 151 or 150,t.gx+1,t.gy+70,0)
-			elseif tl.type=="circle"then
-				ui.spr(shift and 167 or 166,t.gx+1,t.gy+56,0)
-				ui.spr(ctrl and 183 or 182,t.gx+1,t.gy+63,0)
-				ui.spr(alt and 199 or 198,t.gx+1,t.gy+70,0)
+			if ttp=="brush"then
+				ui.spr(brt=="round" and 87 or 86,t.gx+1,t.gy+78,0)
+				ui.spr(brt=="square" and 103 or 102,t.gx+1,t.gy+86,0)
+			elseif ttp=="rect"then
+				ui.spr(shift and 119 or 118,t.gx+1,t.gy+78,0)
+				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+86,0)
+				ui.spr(alt and 151 or 150,t.gx+1,t.gy+94,0)
+			elseif ttp=="circ"then
+				ui.spr(shift and 167 or 166,t.gx+1,t.gy+78,0)
+				ui.spr(ctrl and 183 or 182,t.gx+1,t.gy+86,0)
+				ui.spr(alt and 199 or 198,t.gx+1,t.gy+94,0)
 			end
 		end)
 	end
@@ -1315,7 +1318,7 @@ local tl,rand_cells
 
 		_p(x,y) -- add the initial point
 
-		local s,c,pt,set_abv,set_blw,sy=cells[sel],cells[cur]
+		local s,c,pt,set_abv,set_blw,sy=cells[dum],cells[cur]
 		repeat
 			pt = _p()
 			set_abv,set_blw,sy,x=true,true,s[pt.y],pt.x
@@ -1350,7 +1353,7 @@ local tl,rand_cells
 	end
 
 	local function flood_fill(x,y,tmp)
-		scnln_ft(x,y,tmp or false,eraser and 0 or 1)
+		scnln_ft(x,y,tmp or false,tl.mode=="draw"and 1 or 0)
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1408,59 +1411,77 @@ local tl,rand_cells
 -- Tools
 	tl = {
 		type="brush",
-		orgn=nil,
+		origin=nil,
 		w=0,h=0,
-		mode1=false,  -- filled
-		mode2=false,  -- square
-		mode3=false,  -- centered on mouse
-		drawing=false,
+		mode=nil,
+		mod1=false,  -- filled
+		mod2=false,  -- square
+		mod3=false,  -- centered on mouse
 		brush_size=0,
+		-- brush_type="square",
+		brush_type="round",
 		max_size=10,
-		cats={},
-		cur_pats={},
+		patts={},
+		cur_patts={},
 		cur_cat=1,
-		cur_pat=1,
+		cur_patt=1,
 		do_update=false,
+		clipboard={},
+		-- selected=false,
 	}
-	function tl.start(t,x, y)
-		t.orgn = vec2(x, y)
-		t.drawing = true
+	function tl.start(t,erase)
+		t.origin=vec2(g_mx,g_my)
+		t.mode=erase and"erase"or"draw"
 		t.do_update=true
 	end
 
 	function tl.stop(t)
-		t.drawing = false
+		t.mode=nil
+		t.do_update=true
 	end
 
-	function tl.toggle(t,x, y)
-		if not t.drawing then
-			t:start(x, y)
-		else
-			t:stop()
+	function tl.copy(t)
+		local cb,c,r,cj,cbj={},cells[cur],tl:_base_rect(g_mx,g_my)
+		for j=0,r.h-1 do
+			cbj,cj={},c[j+r.y]
+			for i=0,r.w-1 do
+				cbj[i]=cj[i+r.x]
+			end
+			cb[j]=cbj
 		end
-	end
-
-	function tl.cancel(t)
-		if t.type ~= nil then
-			t:stop()
-		end
-	end
-
-	function tl.commit(t,draw)
-		local s,c,sj,cj=cells[sel],cells[cur]
-		for j=1,GH do
-			sj,cj=s[j],c[j]
-			for i=1,GW do
-				if sj[i]==1then
-					cj[i]=draw and 1 or 0
+		t.clipboard=cb
+		if tl.type=="cut" then
+			for j=0,r.h-1 do
+				cj=c[j+r.y]
+				for i=0,r.w-1 do
+					cj[i+r.x]=0
 				end
 			end
 		end
-		if opts[WRAP_AROUND] then swap_borders(c) end
+		t:clear()
+		t:stop()
+	end
+
+	function tl.commit(t,cancel)
+		if not t.mode then return end
+		if tl.type~="copy"and tl.type~="cut"then
+			local s,c,v,sj,cj=cells[dum],cells[cur],t.mode=="draw"and 1 or 0
+			for j=1,GH do
+				sj,cj=s[j],c[j]
+				for i=1,GW do
+					if sj[i]==1then
+						cj[i]=v
+					end
+				end
+			end
+			if opts[WRAP_AROUND]then swap_borders(c)end
+			if cancel then t:stop()end
+			t.do_update=true
+		end
 	end
 
 	function tl.clear(t)
-		local s,sj=cells[sel]
+		local s,sj=cells[dum]
 		for j=1,GH do
 			sj=s[j]
 			for i=1,GW do
@@ -1469,45 +1490,44 @@ local tl,rand_cells
 		end
 	end
 
-	function tl.switch(t,tp, force)
+	function tl.switch(t,tp,force)
 		if t.type~=tp or force then
-			t:cancel()
-			t.type = tp
+			t:stop()
+			t.type=tp
 			t.do_update=true
 		end
 	end
 
 	function tl.set_modes(c,s,a)
-		if tl.mode1~=c or tl.mode2~=s or tl.mode3~=a then tl.do_update=true end
-		tl.mode1,tl.mode2,tl.mode3=c,s,a
+		if tl.type=="rect"or tl.type=="circ"then
+			if tl.mod1~=c or tl.mod2~=s or tl.mod3~=a then tl.do_update=true end
+			tl.mod1,tl.mod2,tl.mod3=c,s,a
+		end
 	end
 
 	function tl.expand(t)
-		t.brush_size = min(t.brush_size+1, t.max_size)
+		t.brush_size=min(t.brush_size+1, t.max_size)
+		t.do_update=true
 	end
 
 	function tl.contract(t)
-		t.brush_size = max(t.brush_size-1, 0)
+		t.brush_size=max(t.brush_size-1, 0)
+		t.do_update=true
 	end
 
-	-- tl.brush_type="square"
-	tl.brush_type="round"
 	function tl._brush_pts(t,x,y)
-		-- TODO: improve this crappy brush
-		-- r=radius
-		local path= t.drawing and Bres.line(g_lmx,g_lmy,g_mx,g_my) or {point(x,y)}
-		-- local path=Bres.line(g_lmx,g_lmy,x,y)
-		local set,p={}
-		local pts,R={},t.brush_size
-		for i=1, #path do
-			local p=path[i]
-			local xmin,ymin,xmax,ymax=
-					max(1, p.x-R),
-					max(1, p.y-R),
-					min(GW, p.x+R),
-					min(GH, p.y+R)
+		-- local path=t.mode and Bres.line(g_lmx,g_lmy,g_mx,g_my)or{point(x,y)}
+		local path=t.mode and Bres.line(g_lmx,g_lmy,x,y) or {point(x,y)}
+		local set,pts,R,p,xmin,ymin,xmax,ymax={},{},t.brush_size
+		for i=1,#path do
+			p=path[i]
+			xmin,ymin,xmax,ymax=
+					max(1,p.x-R),
+					max(1,p.y-R),
+					min(GW,p.x+R),
+					min(GH,p.y+R)
 
-			if t.brush_type=="square" then    pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
+			if t.brush_type=="square"then pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
 			elseif t.brush_type=="round" then pts=geom._circle_filled(p.x,p.y,xmin,ymin,xmax,ymax,R)
 			end
 
@@ -1517,26 +1537,26 @@ local tl,rand_cells
 		end
 
 		pts={}
-		for k,v in pairs(set) do
+		for k,_ in pairs(set)do
 			pts[#pts+1]=k
 		end
 		tl._commit_pts(pts)
 	end
 
 	function tl._commit_pts(pts)
-		local s=cells[sel]
+		local s=cells[dum]
 		for _,p in ipairs(pts)do
-			if inbounds(p.x,p.y) then
+			if inbounds(p.x,p.y)then
 				s[p.y][p.x]=1
 			end
 		end
 	end
 
 	function tl._base_rect(t,x,y)
-		local o,p1,p2,s,r=t.orgn,{}
+		local o,p1,p2,s,r=t.origin,{}
 		p1,p2=vec2(min(x,o.x),min(y,o.y)),vec2(max(x,o.x),max(y,o.y))
 		s=p2-p1
-		if t.mode2 then -- if square
+		if t.mod2 then -- if square
 			s=vec2(min(s.x,s.y),min(s.x,s.y))
 			if x<o.x then p1.x=p1.x+(o.x-(p1.x+s.x))end
 			if y<o.y then p1.y=p1.y+(o.y-(p1.y+s.y))end
@@ -1545,45 +1565,53 @@ local tl,rand_cells
 	end
 
 	function tl._rect_pts(t,x,y)
-		if t.drawing then
+		if t.mode then
 			local r,pts=tl:_base_rect(x,y)
-			if t.mode3 then r.p=t.orgn-r.s//2 end -- if centered
-			if t.mode1 then pts=geom._rect_filled(r)
-			else            pts=geom._rect_hollow(r)
+			if t.mod3 then r.p=t.origin-r.s//2 end -- if centered
+			if t.mod1 then pts=geom._rect_filled(r)
+			else           pts=geom._rect_hollow(r)
 			end
 			tl._commit_pts(pts)
 		end
 	end
 
 	function tl._circle_pts(t,x,y)
-		if t.drawing then
+		if t.mode then
 			local r,pts,hw,hh=tl:_base_rect(x,y)
-			if t.mode3 then r.p=t.orgn-r.s//2 end -- if centered
+			if t.mod3 then r.p=t.origin-r.s//2 end -- if centered
 			hw,hh=r.w//2,r.h//2
 			pts=Bres.ellipse(r.x+hw,r.y+hh,hw,hh)
 			tl._commit_pts(pts)
-			if t.mode1 then flood_fill(r.c.x,r.c.y,true)end
+			if t.mod1 then flood_fill(r.c.x,r.c.y,true)end
 		end
 	end
 
-	function tl._line_pts(t,x, y)
-		if t.drawing then
-			tl._commit_pts(Bres.line(t.orgn.x,t.orgn.y,x,y))
+	function tl._select_pts(t,x,y)
+		if t.mode then
+			tl._commit_pts(geom._rect_hollow(tl:_base_rect(x,y)))
 		end
 	end
 
-	function tl._fill_pts(t,x, y)
-		flood_fill(x, y)
+	function tl._line_pts(t,x,y)
+		if t.mode then
+			tl._commit_pts(Bres.line(t.origin.x,t.origin.y,x,y))
+		end
 	end
 
-	function tl._patt_pts(t,x, y)
-		local s,p,gy,sj,pj,gx=cells[sel],t.cats[t.cur_cat][t.cur_pat].layout
-		for j=1,t.h do
-			gy=j+(y-1)-t.h
+	function tl._fill_pts(t,x,y)
+		t.mode=cells[cur][y][x]>0 and"erase"or"draw"
+		flood_fill(x,y)
+	end
+
+	function tl._patt_pts(t,x,y)
+		local s,p,gy,sj,pj,gx=cells[dum],t.patts[t.cur_cat][t.cur_patt].layout
+		local w,h=#p[1],#p
+		for j=1,h do
+			gy=j+(y-1)-h
 			if gy>0 and gy<=GH then
 				sj,pj=s[gy],p[j]
-				for i=1,t.w do
-					gx=i+(x-1)-t.w
+				for i=1,w do
+					gx=i+(x-1)-w
 					if gx>0 and gx<=GW then
 						sj[gx]=pj[i]
 					end
@@ -1592,16 +1620,36 @@ local tl,rand_cells
 		end
 	end
 
-	tl._draw_fns = {
-		brush   = tl._brush_pts,
-		rect    = tl._rect_pts,
-		circle  = tl._circle_pts,
-		line    = tl._line_pts,
-		fill    = tl._fill_pts,
-		pattern = tl._patt_pts,
+	function tl._paste_pts(t,x,y)
+		local s,p,gy,sj,pj,gx=cells[dum],t.clipboard
+		local w,h=#p[0],#p
+		for j=1,h do
+			gy=j+(y-1)-h
+			if gy>0 and gy<=GH then
+				sj,pj=s[gy],p[j]
+				for i=1,w do
+					gx=i+(x-1)-w
+					if gx>0 and gx<=GW then
+						sj[gx]=pj[i]
+					end
+				end
+			end
+		end
+	end
+
+	tl._draw_fns={
+		brush = tl._brush_pts,
+		rect  = tl._rect_pts,
+		circ  = tl._circle_pts,
+		line  = tl._line_pts,
+		fill  = tl._fill_pts,
+		patt  = tl._patt_pts,
+		copy  = tl._select_pts,
+		cut   = tl._select_pts,
+		paste = tl._paste_pts,
 	}
 
-	function tl.draw_points(t,x, y)
+	function tl.draw_points(t,x,y)
 		if t.do_update then
 			tl:clear()
 			t._draw_fns[t.type](t,x, y)
@@ -1609,35 +1657,29 @@ local tl,rand_cells
 		end
 	end
 
-	function tl._set_size(t)
-		t.w = t.cats[t.cur_cat][t.cur_pat].w
-		t.h = t.cats[t.cur_cat][t.cur_pat].h
-		tl.do_update=true
-	end
-
 	function tl.set_category(t,c)
 		t.cur_cat = c
-		t.cur_pat = t.cur_pats[t.cur_cat]
-		t:_set_size()
+		t.cur_patt = t.cur_patts[t.cur_cat]
+		t.do_update=true
 	end
 
 	function tl.next_pattern(t)
-		local cat = t.cur_cat
-		local old_pat, new_pat = t.cur_pat, clamp(t.cur_pats[cat]+1, 1, #t.cats[cat])
-		if new_pat ~= old_pat then
-			t.cur_pat = new_pat
-			t.cur_pats[cat] = new_pat
-			t:_set_size()
+		local cat=t.cur_cat
+		local opat, npat=t.cur_patt, clamp(t.cur_patts[cat]+1, 1, #t.patts[cat])
+		if npat ~= opat then
+			t.cur_patt = npat
+			t.cur_patts[cat] = npat
 		end
+		t.do_update=true
 	end
 
 	function tl.prev_pattern(t)
-		local old_pat, new_pat = t.cur_pat, clamp(t.cur_pats[t.cur_cat]-1, 1, #t.cats[t.cur_cat])
-		if new_pat ~= old_pat then
-			t.cur_pat = new_pat
-			t.cur_pats[t.cur_cat] = new_pat
-			t:_set_size()
+		local opat, npat = t.cur_patt, clamp(t.cur_patts[t.cur_cat]-1, 1, #t.patts[t.cur_cat])
+		if npat ~= opat then
+			t.cur_patt = npat
+			t.cur_patts[t.cur_cat] = npat
 		end
+		t.do_update=true
 	end
 
 	function tl._parse_patt(t,p)
@@ -1714,13 +1756,12 @@ local tl,rand_cells
 			},
 		}
 		for j,c in ipairs(pats) do
-			t.cur_pats[j]=1
-			t.cats[j]={}
+			t.cur_patts[j]=1
+			t.patts[j]={}
 			for i,p in ipairs(c) do
-				t.cats[j][i]=t:_parse_patt(p)
+				t.patts[j][i]=t:_parse_patt(p)
 			end
 		end
-		t:_set_size()
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1801,7 +1842,7 @@ local tl,rand_cells
 
 	function init()
 		set_padding(opts[USE_PADDING])
-		tl.orgn = vec0()
+		tl.origin = vec0()
 		tl:init_pats()
 		-- create_cells()
 		set_zoom(pmem(ZOOM_LVL),false,true)
@@ -1847,7 +1888,7 @@ local tl,rand_cells
 
 	local function update_ui()
 	bma("ui update",function()--@bm
-		if cur_scr == GAME_SCR and ui_vis then
+		if state=="game"and ui_vis then
 			PlaybackBar("pb", pb_rect)
 			Toolbar("tb",tb_rect)
 		end
@@ -1856,18 +1897,13 @@ local tl,rand_cells
 
 	local function update()
 	bma("update",function()--@bm
-		if cur_scr==GAME_SCR then
-			-- if use_ibar then ui.lbl_nfo:set_text("") end
-
-			if not ui.mouse_on_ui then
-
-				if mmoved() then
-					-- tl:clear()
-					tl.do_update = true
+		if state=="game"then
+			if mmoved() then
+				if tl.type~="copy"or tl.mode then
+					tl.do_update=true
 				end
-				tl:draw_points(g_mx,g_my)
 			end
-			-- ui.lbl_mouse:set_text(opts[ZOOM_LVL].." | "..g_mx..", "..g_my)
+			tl:draw_points(g_mx,g_my)
 
 			bma("compt gen", function()
 				if not paused and (upd_delay==0 or f%upd_delay==0) then
@@ -1876,9 +1912,8 @@ local tl,rand_cells
 			end) --@bm
 
 			anim:update()
-			-- update_ui()
-		elseif cur_scr == OPTS_SCR then
-			-- update_ui()
+		-- elseif state=="options"then
+		-- 	-- update_ui()
 		end
 	end)--@bm
 	end
@@ -1887,8 +1922,11 @@ local tl,rand_cells
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- render
+	local function prevw_color()
+		return((tl.mode=="erase" or tl.type=="cut")and thm.erase or(tl.type=="copy"and thm.select) or thm.preview)
+	end
 	local function render_rects()
-		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[sel],cells[cur],CS-pad,thm.cell,(eraser and thm.erase or thm.select)
+		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[dum],cells[cur],CS-pad,thm.cell,prevw_color()
 		for j=1,GH do
 			y=(j-1)*CS+pad
 			sj,cj=s[j],c[j]
@@ -1899,61 +1937,29 @@ local tl,rand_cells
 				end
 			end
 		end
-		if not tl.drawing and not ui.mouse_on_ui then
+		if not tl.mode and not ui.mouse_on_ui then
 			rect((g_mx-1)*CS+pad,(g_my-1)*CS+pad,CS-pad,CS-pad,cs)
 		end
 	end
 
 	local function render_pix()
-		local pix,s,c,ca,cs,sj,cj,y=pix,cells[sel],cells[cur],thm.cell,(eraser and thm.erase or thm.select)
+		local pix,s,c,ca,cs,sj,cj,y=pix,cells[dum],cells[cur],thm.cell,prevw_color()
 		for j=1,GH do
 			y,sj,cj=j-1,s[j],c[j]
 			for i=1,GW do
-				if sj[i]==1 and not ui.mouse_on_ui then pix(i-1,y,cs)
+				if sj[i]==1 then pix(i-1,y,cs)
 				elseif cj[i]==1 then pix(i-1,y,ca)
 				end
 			end
 		end
-		if not tl.drawing and not ui.mouse_on_ui and tl.type~="pattern" then
-			pix(g_mx-1,g_my-1,cs)
-		end
-	end
-
-	local function render_rects_trippy()
-		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[sel],cells[cur],CS-pad,thm.cell,(eraser and thm.erase or thm.select)
-		for j=1,GH do
-			y=(j-1)*CS+pad
-			sj,cj=s[j],c[j]
-			for i=1,GW do
-				x=(i-1)*CS+pad
-				if sj[i]==1 and not ui.mouse_on_ui then rect(x,y,rs,rs,cs)
-				elseif cj[i]==1 then rect(x,y,rs,rs,rand(0,15))
-				end
-			end
-		end
-		if not tl.drawing and not ui.mouse_on_ui then
-			rect((g_mx-1)*CS+pad,(g_my-1)*CS+pad,CS-pad,CS-pad,cs)
-		end
-	end
-
-	local function render_pix_trippy()
-		local pix,s,c,ca,cs,sj,cj,y=pix,cells[sel],cells[cur],thm.cell,(eraser and thm.erase or thm.select)
-		for j=1,GH do
-			y,sj,cj=j-1,s[j],c[j]
-			for i=1,GW do
-				if sj[i]==1 and not ui.mouse_on_ui then pix(i-1,y,cs)
-				elseif cj[i]==1 then pix(i-1,y,rand(0,15))
-				end
-			end
-		end
-		if not tl.drawing and not ui.mouse_on_ui and tl.type~="pattern" then
+		if not tl.mode and not ui.mouse_on_ui and tl.type~="patt" then
 			pix(g_mx-1,g_my-1,cs)
 		end
 	end
 
 	local function render_ui()
 	bma("ui_render",function()--@bm
-		if cur_scr == GAME_SCR and info_vis then
+		if state=="game"and info_vis then
 			GenInfo()
 		end
 	end)--@bm
@@ -1968,26 +1974,26 @@ local tl,rand_cells
 
 	local function draw_help()
 		cls(0)
-		local tc,hc,sc=thm.text,thm.header,thm.shad
-		printgsc("Help "..cur_scr-1 .."/"..NUM_HELP_SCRS,_,0,hc)
-		printgsc("H >>",_,16,hc,false)
-		if cur_scr==HELP_SCR1 then
-			printgsc("Screen",1,1,hc)
-			printgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,true)
+		local pgsc,pgs,tc,hc,sc=printgsc,printgs,thm.text,thm.header,thm.shad
+		pgsc("Help ".. tonum(state:sub(5,5)) .."/"..NUM_HELP_SCRS,_,0,hc)
+		pgsc("H >>",_,16,hc,false)
+		if state=="help1" then
+			pgsc("Screen",1,1,hc)
+			pgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,true)
 			spr(256,2*8,5*8+5,0,1,0,0,8,5)
-		elseif cur_scr==HELP_SCR2 then
-			printgsc("Controls",1,1,hc)
-			printgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,true)
-			printgsc("Mouse editing",1,12,hc)
-			printgs(help_strs[3]:gsub('\t',''),2,13,tc,sc,true)
-		elseif cur_scr==HELP_SCR3 then
-			printgsc("Tools",1,1,hc)
-			printgs(help_strs[4]:gsub('\t',''),2,2,tc,sc,true)
-			printgsc("Tool modes",1,7,hc)
-			printgs(help_strs[5]:gsub('\t',''),2,8,tc,sc,true)
-		elseif cur_scr==HELP_SCR4 then
-			printgsc("Pattern Categories",1,2,hc)
-			printgs(help_strs[6]:gsub('\t',''),2,3,tc,sc,true)
+		elseif state=="help2" then
+			pgsc("Controls",1,1,hc)
+			pgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,true)
+			pgsc("Mouse editing",1,12,hc)
+			pgs(help_strs[3]:gsub('\t',''),2,13,tc,sc,true)
+		elseif state=="help3" then
+			pgsc("Tools",1,1,hc)
+			pgs(help_strs[4]:gsub('\t',''),2,2,tc,sc,true)
+			pgsc("Tool modes",1,7,hc)
+			pgs(help_strs[5]:gsub('\t',''),2,8,tc,sc,true)
+		elseif state=="help4" then
+			pgsc("Pattern Categories",1,2,hc)
+			pgs(help_strs[6]:gsub('\t',''),2,3,tc,sc,true)
 		end
 	end
 
@@ -2025,8 +2031,8 @@ local tl,rand_cells
 	bma("render",function()--@bm
 		cls(thm.bg)
 		-- cls(2)
-		if     cur_scr < HELP_SCR1 then draw_game()
-		elseif cur_scr < OPTS_SCR then draw_help()
+		if     state=="game"then draw_game()
+		elseif state~="options"then draw_help()
 		else draw_options()
 		end
 	end)--@bm
@@ -2041,9 +2047,6 @@ function inc_color()
 		wrap(peek(i+2)-1,0,255)
 
 	set_cell_color({r,g,b})
-	-- poke(i,r)
-	-- poke(i+1,g)
-	-- poke(i+2,b)
 end
 
 function dec_color()
@@ -2054,22 +2057,20 @@ function dec_color()
 		wrap(peek(i+2)+1,0,255)
 
 	set_cell_color({r,g,b})
-	-- poke(i,r)
-	-- poke(i+1,g)
-	-- poke(i+2,b)
 end
 
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- input
 	local function handle_keys()
-		local k = keys
+		local k,tp = keys,tl.type
 		if keyp(dbg.key) then dbg:toggle()
 		else
-			if     cur_scr >= OPTS_SCR then
-				if keyp(k.O) then toggle_options() end
-			elseif cur_scr >= HELP_SCR1 then
-				if keyp() or mbtnp() then toggle_help() end
+
+			if state=="options"then
+				if keyp(k.O) then toggle_options()end
+			elseif state~="game" then
+				if keyp()or mbtnp()then toggle_help()end
 			else
 				ctrl = key(k.CTRL)
 				shift = key(k.SHFT)
@@ -2096,76 +2097,65 @@ end
 
 				elseif keyp(k.TAB)                  then toggle_ui()
 				elseif keyp(k.I)                    then toggle_info()
-				elseif keyp(k.E)                    then toggle_eraser()
-				elseif keyp(k.D)or keyp(k.B)or keyp(k.N1)then tl:switch("brush")
+				elseif keyp(k.C) and ctrl then tl:switch("copy")
+				elseif keyp(k.X) and ctrl then tl:switch("cut")
+				elseif keyp(k.V) and ctrl and #tl.clipboard > 0 then tl:switch("paste")
+				elseif keyp(k.D)or keyp(k.B)or keyp(k.N1)then
+					tl.brush_type=ctrl and"square"or"round"
+					tl:switch("brush",true)
 				-- elseif keyp(k.U)                    then ui.tlbar_handle:reset()
 				elseif keyp(k.L)                    then tl:switch("line")
 				elseif keyp(k.R)                    then tl:switch("rect")
 				elseif keyp(k.C) and     shift      then fill_grid(false)
-				elseif keyp(k.C) and not shift      then tl:switch("circle")
+				elseif keyp(k.C) and not shift      then tl:switch("circ")
 				elseif keyp(k.F) and     shift      then fill_grid(true)
 				elseif keyp(k.F) and not shift      then tl:switch("fill")
 				elseif keyp(k.W, 10, 5) then
-					if     tl.type == "brush"   then tl:expand()
-					elseif tl.type == "pattern" then tl:next_pattern()
+					if     tp=="brush"  then tl:expand()
+					elseif tp=="patt"then tl:next_pattern()
 					end
 				elseif keyp(k.S, 10, 5) then
-					if     tl.type == "brush"   then tl:contract()
-					elseif tl.type == "pattern" then tl:prev_pattern()
+					if     tp=="brush"  then tl:contract()
+					elseif tp=="patt"then tl:prev_pattern()
 					end
-				elseif keyp(k.N2) then
-					tl:switch("pattern")
-					tl:set_category(1)
-				elseif keyp(k.N3) then
-					tl:switch("pattern")
-					tl:set_category(2)
-				elseif keyp(k.N4) then
-					tl:switch("pattern")
-					tl:set_category(3)
-				elseif keyp(k.N5) then
-					tl:switch("pattern")
-					tl:set_category(4)
-				elseif keyp(k.N6) then
-					tl:switch("pattern")
-					tl:set_category(5)
+				else
+					for i=k.N2,k.N6 do
+						if keyp(i) then
+							tl:switch("patt")
+							tl:set_category(i-k.N2+1)
+						end
+					end
 				end
 			end
 		end
 	end
-
+-- 61314
 	local function handle_mouse()
 		g_mx,g_my=mx//CS+1,my//CS+1
 		g_lmx,g_lmy=lmx//CS+1,lmy//CS+1
 
-		if cur_scr == GAME_SCR and not ui.mouse_on_ui then
-			if mbtnp(M2) then
-				tl:cancel()
-			else
-				if tl.type=="brush" then
-					if     mbtn(M1) then
-						tl:start()
-						tl:commit(not eraser)
-					elseif mbtn(M2) then
-						tl:start()
-						tl:commit(false)
-					elseif mbtnr(M1) then tl:stop()
-					elseif mbtnr(M2) then tl:stop()
+		local tp,tm=tl.type,tl.mode
+		if state=="game"and not ui.mouse_on_ui then
+			if mbtnp(M1)then
+				if tm=="erase"then tl:stop()
+				else tl:start()
+				end
+			elseif mbtnp(M2)then
+				if tm=="draw"then tl:stop()
+				else tl:start(true) -- true for erasing
+				end
+			elseif mbtnr(M1)and(tp=="copy"or tp=="cut")then
+				tl:copy()
+			elseif(mbtnr(M1)or mbtnr(M2))and tm then
+				if tp=="brush"then tl:stop()
+				elseif tp=="fill"then
+					if mbtnr(M1)and tm~="erase"or mbtnr(M2)and tm=="erase"then
+						tl:commit(true)
 					end
-				elseif mbtnp(M1) then
-					if tl.type == "line" then
-						if tl.drawing then tl:commit(not eraser) end
-						tl:start(g_mx, g_my)
-					elseif (tl.type == "fill" or tl.type == "pattern") or tl.drawing then
-						tl:commit(not eraser)
-						tl:cancel()
-					else
-						tl:toggle(g_mx, g_my)
-					end
-				elseif mbtnp(M3) then
-					tl:commit(false)
-					tl:cancel()
+				else tl:commit(true) -- true for canceling
 				end
 			end
+			if tp=="brush"and tm then tl:commit()end
 		end
 	end
 
@@ -2195,20 +2185,13 @@ end
 		ui_vis=not ui_vis
 	end
 
+	local _hs_={game="help1",help1="help2",help2="help3",help3="help4",help4="game"}
 	function toggle_help()
-		if cur_scr == GAME_SCR then
-			cur_scr = HELP_SCR1
-		else
-			cur_scr = wrap(cur_scr+1, 1, NUM_HELP_SCRS+1)--%(NUM_HELP_SCRS+1)
-		end
+		state=_hs_[state]
 	end
 
 	function toggle_options()
-		if cur_scr == GAME_SCR then
-			cur_scr = OPTS_SCR
-		else
-			cur_scr = GAME_SCR
-		end
+		state=state=="game"and"options"or"game"
 	end
 
 	function unpause()
@@ -2229,10 +2212,6 @@ end
 		if paused then unpause()
 		else pause()
 		end
-	end
-
-	function toggle_eraser()
-		eraser = not eraser
 	end
 
 	function reset()
