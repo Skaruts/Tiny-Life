@@ -452,13 +452,11 @@
 		end
 
 		function ui._render()
-			if ui.visible then
-				local unpk,_rend_step_fns=unpk,ui._rend_step_fns
-				for _,v in ipairs(ui._rend_steps)do
-					_rend_step_fns[v[1]](unpk(v[2]))
-				end
-				ui._rend_steps={}
+			local unpk,_rend_step_fns=unpk,ui._rend_step_fns
+			for _,v in ipairs(ui._rend_steps)do
+				_rend_step_fns[v[1]](unpk(v[2]))
 			end
+			ui._rend_steps={}
 		end
 
 		function ui.end_frame()
@@ -850,7 +848,7 @@ local tl,rand_cells
 		-- },
 	}
 
-	local ui_vis,info_vis=true,true
+	local tb_vis,info_vis=true,true
 	function toggle_info()
 		info_vis=not info_vis
 	end
@@ -1691,7 +1689,7 @@ local tl,rand_cells
 
 	local function update_ui()
 	bma("ui update",function()--@bm
-		if state=="game"and ui_vis then
+		if state=="game"and tb_vis then
 			PlaybackBar("pb", pb_rect)
 			Toolbar("tb",tb_rect)
 		end
@@ -1761,7 +1759,7 @@ local tl,rand_cells
 		if info_vis then
 			GenInfo()
 		end
-		if opts[USE_TLTIPS] then--and ui_vis then
+		if opts[USE_TLTIPS] and tb_vis then
 			ToolTip()
 		end
 	end)--@bm
@@ -1800,35 +1798,37 @@ local tl,rand_cells
 	end
 
 	local function draw_options()
-		cls(1)
-		local tc,hc,lbt,oc,c,tx=thm.text,thm.header,{shadow=1},cell_col
-		printgsc("Options ",_,1,hc)
-		printgsc("O >>",_,16,hc,false)
+		ui.with_visible(true,function()
+			cls(1)
+			local tc,hc,lbt,oc,c,tx=thm.text,thm.header,{shadow=1},cell_col
+			printgsc("Options ",_,1,hc)
+			printgsc("O >>",_,16,hc,false)
 
-		tx=24
-		for i=1,#opts-1 do
-			Switch("s"..i,16,tx+8*(i-1),opts[i],function(t)
-				if t.switched then toggle_opt(i)end
+			tx=24
+			for i=1,#opts-1 do
+				Switch("s"..i,16,tx+8*(i-1),opts[i],function(t)
+					if t.switched then toggle_opt(i)end
+				end)
+			end
+			Switch("s9",16,tx+32,opts[USE_TLTIPS],function(t)
+				if t.switched then toggle_opt(USE_TLTIPS)end
 			end)
-		end
-		Switch("s9",16,tx+32,opts[USE_TLTIPS],function(t)
-			if t.switched then toggle_opt(USE_TLTIPS)end
-		end)
-		Label("l1",34,tx+1  ,"Use cell padding",tc,lbt)
-		Label("l2",34,tx+1+8,"Wrap around edges",tc,lbt)
-		Label("l3",34,tx+1+16,"Randomize at startup",tc,lbt)
-		Label("l4",34,tx+1+24,"Reset on randomize",tc,lbt)
-		Label("l5",34,tx+1+32,"Enable tooltips",tc,lbt)
+			Label("l1",34,tx+1  ,"Use cell padding",tc,lbt)
+			Label("l2",34,tx+1+8,"Wrap around edges",tc,lbt)
+			Label("l3",34,tx+1+16,"Randomize at startup",tc,lbt)
+			Label("l4",34,tx+1+24,"Reset on randomize",tc,lbt)
+			Label("l5",34,tx+1+32,"Enable tooltips",tc,lbt)
 
-		Spinbox("sp1",16,tx+48,opts[ZOOM_LVL],1,4,1,function(t)
-			if t.val_changed then set_zoom(t.val,true)end
-		end)
-		Label("l4",40,tx+48,"Zoom level",tc,lbt)
+			Spinbox("sp1",16,tx+48,opts[ZOOM_LVL],1,4,1,function(t)
+				if t.val_changed then set_zoom(t.val,true)end
+			end)
+			Label("l4",40,tx+48,"Zoom level",tc,lbt)
 
-		local c=CellColorPicker("cp",48,100,oc)
-		if c[1]~=oc[1]or c[2]~=oc[2]or c[3]~=oc[3]then
-			set_cell_color(c)
-		end
+			local c=CellColorPicker("cp",48,100,oc)
+			if c[1]~=oc[1]or c[2]~=oc[2]or c[3]~=oc[3]then
+				set_cell_color(c)
+			end
+		end)
 	end
 
 	local function render()
@@ -1894,6 +1894,7 @@ end
 				elseif keyp(k.O)then toggle_options()
 				elseif keyp(k.H)then toggle_help()
 				elseif keyp(k.P)then toggle_padding()
+				elseif keyp(k.T)then toggle_toolbars()
 				elseif keyp(k.TAB)then toggle_ui()
 				elseif keyp(k.I)then toggle_info()
 				elseif keyp(k.C)then
@@ -1984,7 +1985,11 @@ end
 	end
 
 	function toggle_ui()
-		ui_vis=not ui_vis
+		ui.visible=not ui.visible
+	end
+
+	function toggle_toolbars()
+		tb_vis=not tb_vis
 	end
 
 	local _hs_={game="help1",help1="help2",help2="help3",help3="help4",help4="game"}
