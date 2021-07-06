@@ -1094,15 +1094,15 @@ local tl,rand_cells
 		local w,h,tc,r,g,b=80,24,thm.dim_text,unpk(c)
 		ui.with_item(id,x,y,w,h,_,function(t,...)
 			Label("l4",24,1,"Cell color",thm.txt,{shadow=1})
-			ui.spr(1,t.gx+88,t.gy)
+			ui.spr(1,t.gx+88,t.gy,0)
 
 			r=ColorBar("cb1",8,8,r)
 			g=ColorBar("cb2",8,16,g)
 			b=ColorBar("cb3",8,24,b)
 
-			Label("l1",8*11,8, r,tc)
-			Label("l1",8*11,16,g,tc)
-			Label("l1",8*11,24,b,tc)
+			Label("l1",8*11,8+1, r,tc)
+			Label("l1",8*11,16+1,g,tc)
+			Label("l1",8*11,24+1,b,tc)
 		end)
 		return {r,g,b}
 	end
@@ -1321,7 +1321,7 @@ local tl,rand_cells
 		t.do_update=true
 	end
 
-	function tl.set_modes(c,s,a)
+	function tl.set_mods(c,s,a)
 		if tl.type=="rect"or tl.type=="circ"then
 			if tl.mod1~=c or tl.mod2~=s or tl.mod3~=a then tl.do_update=true end
 			tl.mod1,tl.mod2,tl.mod3=c,s,a
@@ -1817,7 +1817,14 @@ local tl,rand_cells
 			cls(1)
 			local tc,hc,lbt,oc,c,tx=thm.text,thm.header,{shadow=1},cell_col
 			printgsc("Options ",_,1,hc)
-			printgsc("O >>",_,16,hc,false)
+
+			-- hacky, but avoids wasting tokens on a proper text button for a single use
+			if ui.is_under_mouse(111,127,19,7)then
+				printgsc("O >>",_,16,6)
+				if mbtnr(M1)then toggle_options()end
+			else
+				printgsc("O >>",_,16,hc)
+			end
 
 			tx=24
 			for i=1,#opts-1 do
@@ -1892,7 +1899,7 @@ end
 				shift=key(k.SHFT)
 				alt=key(k.ALT)
 
-				tl.set_modes(ctrl,shift,alt)
+				tl.set_mods(ctrl,shift,alt)
 
 				if keyp(k.SPACE)then if shift then pause(true)else toggle_pause()end
 				elseif keyp(k.G,10,5)then if paused then compute_gen()end
