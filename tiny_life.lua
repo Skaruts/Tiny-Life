@@ -966,7 +966,7 @@ local tl,rand_cells
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
 	local pb_rect={x=240//2-76//2,  y=-2,            w=76,  h=10}
-	local tb_rect={x=-2,            y=136//2-104//2,  w=10,  h=104}
+	local tb_rect={x=-2,            y=136//2-100//2,  w=10,  h=100}
 	local thm={
 		bg=0,
 		fg=13,
@@ -1000,15 +1000,6 @@ local tl,rand_cells
 		return icn
 	end
 
-	-- function _btn_col(t)
-	-- 	local b=thm.btn
-	-- 	if t.hovered then
-	-- 		if t.held then return b.fg_p,b.bg_p end
-	-- 		return b.fg_h,b.bg_h
-	-- 	end
-	-- 	return b.fg_n,b.bg_n
-	-- end
-
 	function Label(id,x,y,tx,c,op) -- align, op)
 		c=c or thm.text
 		ui.with_item(id,x,y,0,0,op,function(t)
@@ -1027,18 +1018,15 @@ local tl,rand_cells
 		end)
 	end
 
-	-- local function TButton(id,x,y,txt,op)
-	-- 	local w=txtw(txt)+2
-	-- 	return ui.with_item(id,x,y,w,8,op,function(t,...)
-	-- 		t:check_hovered(t.gx,t.gy,w,t.h)
-	-- 		t:check_pressed()
-	-- 		if t.code then t:code(...)end
-	-- 		if t.shadow then ui.prints(txt,t.gx,t.gy+2,_btn_col(t),t.shadow)
-	-- 		else
-	-- 			ui.print(txt,t.gx,t.gy+2,_btn_col(t),false,1,false)
-	-- 		end
-	-- 	end)
-	-- end
+	function TLButton(id,x,y,icn,on)
+		return ui.with_item(id,x,y,8,8,_,function(t,...)
+			t:check_hovered(t.gx,t.gy,t.w,t.h)
+			t:check_pressed()
+			if t.code then t:code(...)end
+			icn=(not ui.active and icn+4) or on and icn+2 or icn
+			ui.spr(icn+(t.hovered and 1 or 0),t.gx,t.gy,0)
+		end)
+	end
 
 	function GenInfo()
 		-- ui.with_item("gi",x,y,w,h,nil,function(t)
@@ -1046,7 +1034,11 @@ local tl,rand_cells
 			local ty,tc,oc,cstr,tcstr,tstr=2,thm.text,thm.outl,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
 			printo("Gen: "..gens,2,ty,tc,oc,_,_,true)
 
-			ty=ty+8*16-1
+			ty=ty+8*15-1
+			if tl.type=="patt"then
+				printo(fmt("%s: %s",cats[tl.cur_cat],tl.cur_pat),2,ty,thm.dim_text,oc,_,_,true)
+			end
+			ty=ty+8
 			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,_,_,true)
 			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),40,ty,tc,oc,_,_,true)
 			printo("Speed:"..1-(1*(upd_delay/100)),70,ty,tc,oc,_,_,true)
@@ -1055,6 +1047,7 @@ local tl,rand_cells
 			     .."|"..rep(' ',6-#tcstr)..tcstr
 			     .."/"..rep(' ',6-#tstr)..tstr
 				,140,ty,tc,oc,false,_,true)
+
 		end
 	end
 
@@ -1109,44 +1102,40 @@ local tl,rand_cells
 		end)
 	end
 
+	local tl_types={"brush","rect","circ","line","fill","patt","copy","cut","paste"}
 	function Toolbar(id,r,op)
 		ui.with_item("tb",r.x,r.y,r.w,r.h,op,function(t)
 			ui.nframe(r.x,r.y,r.w,r.h,3)
-			local ttp,cb,brt,b1,b2,b3,b4,b5,b6,b7,b8,b9=tl.type,#tl.clipboard>0,tl.brush_type
-			b1=Button("b_brush",1, 1,112+(ttp=="brush"and 2 or 0))
-			b2=Button("b_rect", 1, 9,128+(ttp=="rect"and 2 or 0))
-			b3=Button("b_circ", 1,17,144+(ttp=="circ"and 2 or 0))
-			b4=Button("b_line", 1,25,160+(ttp=="line"and 2 or 0))
-			b5=Button("b_fill", 1,33,176+(ttp=="fill"and 2 or 0))
-			b6=Button("b_patt", 1,41,192+(ttp=="patt"and 2 or 0))
-			b7=Button("b_copy", 1,49,136+(ttp=="copy"and 2 or 0))
-			b8=Button("b_cut",  1,57,152+(ttp=="cut"and 2 or 0))
-			ui.with_active(cb,function()
-				b9=Button("b_paste",1,65,cb and (168+(ttp=="paste" and 2 or 0))or 169)
-			end)
-			if b1.released then tl:switch("brush")end
-			if b2.released then tl:switch("rect")end
-			if b3.released then tl:switch("circ")end
-			if b4.released then tl:switch("line")end
-			if b5.released then tl:switch("fill")end
-			if b6.released then tl:switch("patt")end
-			if b7.released then tl:switch("copy")end
-			if b8.released then tl:switch("cut")end
-			if b9.released then tl:switch("paste")end
+			local ttp,cb,brt,btns=tl.type,#tl.clipboard>0,tl.brush_type
+			btns={
+					TLButton("b_brush",1, 1,112,ttp=="brush"),
+					TLButton("b_rect",1, 9,128,ttp=="rect"),
+					TLButton("b_circ",1,17,144,ttp=="circ"),
+					TLButton("b_line",1,25,160,ttp=="line"),
+					TLButton("b_fill",1,33,176,ttp=="fill"),
+					TLButton("b_patt",1,41,192,ttp=="patt"),
+					TLButton("b_copy",1,49,136,ttp=="copy"),
+					TLButton("b_cut", 1,57,152,ttp=="cut")
+				}
 
-			ui.spr(4,t.gx+1,t.gy+72,0)
+			btns[9]=ui.with_active(cb,TLButton,"b_paste",1,65,168,ttp=="paste")
+
+			for i,b in ipairs(btns)do
+				if b.released then tl:switch(tl_types[i])end
+			end
+			ui.spr(4,t.gx+1,t.gy+71,0)
 
 			if ttp=="brush"then
-				ui.spr(brt=="round" and 87 or 86,t.gx+1,t.gy+78,0)
-				ui.spr(brt=="square" and 103 or 102,t.gx+1,t.gy+86,0)
+				ui.spr(brt=="round" and 87 or 86,t.gx+1,t.gy+76,0)
+				ui.spr(brt=="square" and 103 or 102,t.gx+1,t.gy+83,0)
 			elseif ttp=="rect"then
-				ui.spr(shift and 119 or 118,t.gx+1,t.gy+78,0)
-				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+86,0)
-				ui.spr(alt and 151 or 150,t.gx+1,t.gy+94,0)
+				ui.spr(shift and 119 or 118,t.gx+1,t.gy+76,0)
+				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+83,0)
+				ui.spr(alt and 151 or 150,t.gx+1,t.gy+90,0)
 			elseif ttp=="circ"then
-				ui.spr(shift and 167 or 166,t.gx+1,t.gy+78,0)
-				ui.spr(ctrl and 183 or 182,t.gx+1,t.gy+86,0)
-				ui.spr(alt and 199 or 198,t.gx+1,t.gy+94,0)
+				ui.spr(shift and 167 or 166,t.gx+1,t.gy+76,0)
+				ui.spr(ctrl and 183 or 182,t.gx+1,t.gy+83,0)
+				ui.spr(alt and 199 or 198,t.gx+1,t.gy+90,0)
 			end
 		end)
 	end
@@ -1436,6 +1425,11 @@ local tl,rand_cells
 		end
 	end
 
+	function tl.toggle_brush(t)
+		t.brush_type=t.brush_type=="square"and"round"or"square"
+		t.do_update=true
+	end
+
 	function tl.set_modes(c,s,a)
 		if tl.type=="rect"or tl.type=="circ"then
 			if tl.mod1~=c or tl.mod2~=s or tl.mod3~=a then tl.do_update=true end
@@ -1454,23 +1448,18 @@ local tl,rand_cells
 	end
 
 	function tl._brush_pts(t,x,y)
-		-- local path=t.mode and Bres.line(g_lmx,g_lmy,g_mx,g_my)or{point(x,y)}
 		local path=t.mode and Bres.line(g_lmx,g_lmy,x,y) or {point(x,y)}
 		local set,pts,R,p,xmin,ymin,xmax,ymax={},{},t.brush_size
 		for i=1,#path do
 			p=path[i]
-			xmin,ymin,xmax,ymax=
-					max(1,p.x-R),
-					max(1,p.y-R),
-					min(GW,p.x+R),
-					min(GH,p.y+R)
+			xmin,ymin,xmax,ymax=max(1,p.x-R),max(1,p.y-R),min(GW,p.x+R),min(GH,p.y+R)
 
 			if t.brush_type=="square"then pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
 			elseif t.brush_type=="round" then pts=geom._circle_filled(p.x,p.y,xmin,ymin,xmax,ymax,R)
 			end
 
-			for _,v in ipairs(pts)do
-				set[v]=1
+			for i=1, #pts do
+				set[pts[i]]=1
 			end
 		end
 
@@ -1995,64 +1984,64 @@ end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- input
 	local function handle_keys()
-		local k,tp = keys,tl.type
-		if keyp(dbg.key) then dbg:toggle()
+		if keyp(dbg.key)then dbg:toggle()
 		else
-
+			local k,tp=keys,tl.type
 			if state=="options"then
-				if keyp(k.O) then toggle_options()end
-			elseif state~="game" then
+				if keyp(k.O)then toggle_options()end
+			elseif state~="game"then
 				if keyp()or mbtnp()then toggle_help()end
 			else
-				ctrl = key(k.CTRL)
-				shift = key(k.SHFT)
-				alt = key(k.ALT)
+				ctrl=key(k.CTRL)
+				shift=key(k.SHFT)
+				alt=key(k.ALT)
 
 				tl.set_modes(ctrl,shift,alt)
 
-				if     keyp(k.SPACE)                then if shift then pause(true) else toggle_pause() end
-				elseif keyp(k.G,10,5)               then if paused then compute_gen() end
-				elseif keyp(k.ENTER)                then rand_cells(opts[RAND_RESET])
-				elseif keyp(k.PGUP)                 then inc_zoom()
-				elseif keyp(k.PGDN)                 then dec_zoom()
+				if keyp(k.SPACE)then if shift then pause(true)else toggle_pause()end
+				elseif keyp(k.G,10,5)then if paused then compute_gen()end
+				elseif keyp(k.ENTER)then rand_cells(opts[RAND_RESET])
+				elseif keyp(k.PGUP)then inc_zoom()
+				elseif keyp(k.PGDN)then dec_zoom()
 
-				elseif shift and key(k.UP)          then inc_speed()
-				elseif shift and key(k.DOWN)        then dec_speed()
-				elseif keyp(k.UP)                   then inc_speed()
-				elseif keyp(k.DOWN)                 then dec_speed()
-				elseif key(k.LEFT)                  then inc_color()
-				elseif key(k.RIGHT)                 then dec_color()
-
-				elseif keyp(k.O)                    then toggle_options()
-				elseif keyp(k.H)                    then toggle_help()
-				-- elseif keyp(k.P)                    then ui.cbx_pad:toggle_state()
-
-				elseif keyp(k.TAB)                  then toggle_ui()
-				elseif keyp(k.I)                    then toggle_info()
-				elseif keyp(k.C) and ctrl then tl:switch("copy")
-				elseif keyp(k.X) and ctrl then tl:switch("cut")
-				elseif keyp(k.V) and ctrl and #tl.clipboard > 0 then tl:switch("paste")
+				elseif shift and key(k.UP)then inc_speed()
+				elseif shift and key(k.DOWN)then dec_speed()
+				elseif keyp(k.UP)then inc_speed()
+				elseif keyp(k.DOWN)then dec_speed()
+				-- elseif key(k.LEFT)                  then inc_color()
+				-- elseif key(k.RIGHT)                 then dec_color()
+				elseif keyp(k.O)then toggle_options()
+				elseif keyp(k.H)then toggle_help()
+				elseif keyp(k.P)then toggle_padding()
+				elseif keyp(k.TAB)then toggle_ui()
+				elseif keyp(k.I)then toggle_info()
+				elseif keyp(k.C)then
+					if shift then fill_grid(false)
+					else tl:switch(ctrl and"copy"or"circ")
+					end
+				elseif keyp(k.X)and ctrl then tl:switch("cut")
+				elseif keyp(k.V)and ctrl and #tl.clipboard>0 then tl:switch("paste")
 				elseif keyp(k.D)or keyp(k.B)or keyp(k.N1)then
-					tl.brush_type=ctrl and"square"or"round"
-					tl:switch("brush",true)
-				-- elseif keyp(k.U)                    then ui.tlbar_handle:reset()
-				elseif keyp(k.L)                    then tl:switch("line")
-				elseif keyp(k.R)                    then tl:switch("rect")
-				elseif keyp(k.C) and     shift      then fill_grid(false)
-				elseif keyp(k.C) and not shift      then tl:switch("circ")
-				elseif keyp(k.F) and     shift      then fill_grid(true)
-				elseif keyp(k.F) and not shift      then tl:switch("fill")
-				elseif keyp(k.W, 10, 5) then
-					if     tp=="brush"  then tl:expand()
+					if tp~="brush"then tl:switch("brush")
+					else tl:toggle_brush()
+					end
+				elseif keyp(k.L)then tl:switch("line")
+				elseif keyp(k.R)then tl:switch("rect")
+				elseif keyp(k.F)then
+					if shift then fill_grid(true)
+					else tl:switch("fill")
+					end
+				elseif keyp(k.W,10,5)then
+					if tp=="brush"then tl:expand()
 					elseif tp=="patt"then tl:next_pattern()
 					end
-				elseif keyp(k.S, 10, 5) then
-					if     tp=="brush"  then tl:contract()
+				elseif keyp(k.S,10,5)then
+					if tp=="brush"then tl:contract()
 					elseif tp=="patt"then tl:prev_pattern()
 					end
 				else
 					for i=k.N2,k.N6 do
-						if keyp(i) then
+						if keyp(i)then
 							tl:switch("patt")
 							tl:set_category(i-k.N2+1)
 						end
@@ -2061,7 +2050,7 @@ end
 			end
 		end
 	end
--- 61314
+
 	local function handle_mouse()
 		g_mx,g_my=mx//CS+1,my//CS+1
 		g_lmx,g_lmy=lmx//CS+1,lmy//CS+1
