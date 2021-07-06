@@ -841,11 +841,6 @@ local tl,rand_cells
 		select=14,
 		erase=7,
 		dim_text=14,
-		-- btn={
-		-- 	fg_n=3,bg_n=0, -- normal
-		-- 	fg_h=4,bg_h=0, -- hovered
-		-- 	fg_p=5,bg_p=0, -- pressed
-		-- },
 	}
 
 	local tb_vis,info_vis=true,true
@@ -1057,37 +1052,57 @@ local tl,rand_cells
 		end)
 	end
 
-	-- function ColorBar(id,x,y,val)
-	-- 	local w=10*8,8
-	-- 	ui.with_item(id,x,y,w,h,_,function(t, ...)
-	-- 		Button("lb",0,0,214)
-	-- 		Button("rb",72,0,230)
-	-- 		for i=0,7 do
-	-- 			-- 217
-	-- 			-- 233
-	-- 			ui.spr(217,t.gx+8*(i+1),t.gy,0)
-	-- 		end
-	-- 		local hx=t.gx+6+(val//8)
-	-- 		trace(hx)
-	-- 		ui.spr(218,hx,t.gy,0)
-	-- 	end)
-	-- 	return val
-	-- end
+	function Slider(id,x,y,l,val,minv,maxv,op)
+		local w,h,ov,px,py=l*8,8,val
+		ui.with_item(id,x,y,w,h,_,function(t,...)
+			px,py=t.gx,t.gy
+			t:check_hovered(px,py,w,h)
+			t:check_pressed()
+
+			if t.held then
+				pmx = clamp(mx-px,0,w)
+				val=(pmx*maxv)//(w)
+			end
+
+			if val~=ov then t.val_changed=true end
+			t.val=val
+			t:exec()
+			for i=0,(l-1)*8,8 do
+				ui.spr(7,px+i,py)
+			end
+			px=px+clamp(((w-2)*val)//maxv,0,(w-2))
+			ui.spr(9,px,py,0)
+		end)
+		return val
+	end
+
+	function ColorBar(id,x,y,val)
+		local w,h,b1,b2=10*8,8
+		ui.with_item(id,x,y,w,h,_,function(t, ...)
+			val=Slider("s",8,0,8,val,0,255)
+			ui.spr(6,t.gx,t.gy)
+			ui.spr(8,t.gx+9*8,t.gy)
+			b1=ui.with_active(val>0,Button,"lb",0,0,22)
+			b2=ui.with_active(val<255,Button,"rb",9*8,0,26)
+			if b1.released then val=val-1 end
+			if b2.released then val=val+1 end
+		end)
+		return val
+	end
 
 	function CellColorPicker(id,x,y,c)
-		local w,h,r,g,b=80,24,unpk(c)
-		ui.with_item(id,x,y,w,h,_,function(t, ...)
+		local w,h,tc,r,g,b=80,24,thm.dim_text,unpk(c)
+		ui.with_item(id,x,y,w,h,_,function(t,...)
 			Label("l4",24,1,"Cell color",thm.txt,{shadow=1})
 			ui.spr(1,t.gx+88,t.gy)
-			local s1,s2,s3
 
-			-- cell_col[1]=ColorBar("br1",8,8,cell_col[1])
-			s1=Spinbox("sb1",8, 8,r,0,255,1)
-			s2=Spinbox("sb2",8,16,g,0,255,1)
-			s3=Spinbox("sb3",8,24,b,0,255,1)
-			if s1.val_changed then r=s1.val end
-			if s2.val_changed then g=s2.val end
-			if s3.val_changed then b=s3.val end
+			r=ColorBar("cb1",8,8,r)
+			g=ColorBar("cb2",8,16,g)
+			b=ColorBar("cb3",8,24,b)
+
+			Label("l1",8*11,8, r,tc)
+			Label("l1",8*11,16,g,tc)
+			Label("l1",8*11,24,b,tc)
 		end)
 		return {r,g,b}
 	end
@@ -1824,7 +1839,7 @@ local tl,rand_cells
 			end)
 			Label("l4",40,tx+48,"Zoom level",tc,lbt)
 
-			local c=CellColorPicker("cp",48,100,oc)
+			local c=CellColorPicker("cp",8,88,oc)
 			if c[1]~=oc[1]or c[2]~=oc[2]or c[3]~=oc[3]then
 				set_cell_color(c)
 			end
