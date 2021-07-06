@@ -778,22 +778,22 @@
 		                8 Cells alive|dead/total
 		]],
 		[[
-			H         Cycle help screens
+			H         Show help
 			O         Toggle Options
 			SPACE     Pause/play
 			  +SHIFT  Reset (stop)
 			ENTER     Randomize cells
 			SHIFT+C/F Revive/kill all cells
 			G         Next generation (if paused)
-			TAB/I     Toggle UI/info
+			TAB/I/T   Toggle UI/info/toolbars
 			PG-UP/DN  Zoom in/out (resets cells)
-			Up/Down   increased/decrease speed 1 step
-			  +SHIFT  increased/decrease speed
+			Up/Down   inc/decrease speed by 1
+			  +SHIFT  inc/decrease speed
 			P         Toggle padding (if zoom>2)
 		]],
 		[[
-			Mouse1(R) Drawing/cancel erasing
-			Mouse2(L) Erase/cancel drawing
+			Mouse1(L) Drawing/cancel erasing
+			Mouse2(R) Erase/cancel drawing
 		]],
 		[[
 			B/D/1     Brush tool (x2 switch mode)
@@ -937,24 +937,24 @@ local tl,rand_cells
 			b2=Button("b_zoom",10,1,19, {tip="Zoom in"}   )
 			Separator(15,1)
 			b3=ui.with_active(upd_delay<100,Button,"b_back",22,1,32,{tip="Slower speed"})
-			b4=Button("b_stop",30,1,stopped and 67 or 64,{tip="Stop and reset the board"})
+			b4=Button("b_stop",30,1,stopped and 67 or 64,{tip="Stop and reset board"})
 
 			if stopped then
-				b5=Button("b_play",38,1,80,{tip="Start the simulation"})
+				b5=Button("b_play",38,1,80,{tip="Start simulation"})
 				if b5.released then unpause()end
 			elseif paused then
-				b5=Button("b_play",38,1,83,{tip="Resume the simulation"})
+				b5=Button("b_play",38,1,83,{tip="Resume simulation"})
 				if b5.released then unpause()end
 			else
-				b6=Button("b_pause",38,1,96,{tip="Pause the simulation"})
+				b6=Button("b_pause",38,1,96,{tip="Pause simulation"})
 				if b6.released then pause()end
 			end
 
 			b7=ui.with_active(upd_delay>0,Button,"b_fwd",46,1,48,{tip="Faster speed"})
 
 			Separator(52,1)
-			b8=Button("b_opts",59,1,240,{tip="See options"})
-			b9=Button("b_help",67,1,243,{tip="See help"})
+			b8=Button("b_opts",59,1,240,{tip="Show options"})
+			b9=Button("b_help",67,1,243,{tip="Show help"})
 
 			if b1.released then rand_cells()end
 			if b2.released then inc_zoom()end
@@ -979,14 +979,14 @@ local tl,rand_cells
 			ui.nframe(r.x,r.y,r.w,r.h,3)
 			local ttp,cb,brt,btns=tl.type,#tl.clipboard>0,tl.brush_type
 			btns={
-					TLButton("b_brush",1, 1,112,ttp=="brush", {tip="Brush tool"}        ),
-					TLButton("b_rect",1, 9,128,ttp=="rect",   {tip="Rect tool"}        ),
-					TLButton("b_circ",1,17,144,ttp=="circ",   {tip="Circle tool"}        ),
-					TLButton("b_line",1,25,160,ttp=="line",   {tip="Line tool"}        ),
-					TLButton("b_fill",1,33,176,ttp=="fill",   {tip="Fill tool"}        ),
-					TLButton("b_patt",1,41,192,ttp=="patt",   {tip="Pattern tool"}        ),
-					TLButton("b_copy",1,49,136,ttp=="copy",   {tip="Copy tool"}        ),
-					TLButton("b_cut", 1,57,152,ttp=="cut",    {tip="Cut tool"}        )
+					TLButton("b_brush",1,1,112,ttp=="brush",{tip="Brush tool"}),
+					TLButton("b_rect",1,9,128,ttp=="rect",{tip="Rect tool"}),
+					TLButton("b_circ",1,17,144,ttp=="circ",{tip="Circle tool"}),
+					TLButton("b_line",1,25,160,ttp=="line",{tip="Line tool"}),
+					TLButton("b_fill",1,33,176,ttp=="fill",{tip="Fill tool"}),
+					TLButton("b_patt",1,41,192,ttp=="patt",{tip="Pattern tool"}),
+					TLButton("b_copy",1,49,136,ttp=="copy",{tip="Copy tool"}),
+					TLButton("b_cut",1,57,152,ttp=="cut",{tip="Cut tool"})
 				}
 
 			btns[9]=ui.with_active(cb,TLButton,"b_paste",1,65,168,ttp=="paste",{tip="Paste tool"})
@@ -997,8 +997,8 @@ local tl,rand_cells
 			ui.spr(4,t.gx+1,t.gy+71,0)
 
 			if ttp=="brush"then
-				ui.spr(brt=="round" and 87 or 86,t.gx+1,t.gy+76,0)
-				ui.spr(brt=="square" and 103 or 102,t.gx+1,t.gy+83,0)
+				ui.spr(brt=="round"and 87 or 86,t.gx+1,t.gy+76,0)
+				ui.spr(brt=="square"and 103 or 102,t.gx+1,t.gy+83,0)
 			elseif ttp=="rect"then
 				ui.spr(shift and 119 or 118,t.gx+1,t.gy+76,0)
 				ui.spr(ctrl and 135 or 134,t.gx+1,t.gy+83,0)
@@ -1791,15 +1791,15 @@ local tl,rand_cells
 		cls(0)
 		local pgsc,pgs,tc,hc,sc=printgsc,printgs,thm.text,thm.header,thm.shad
 		pgsc("Help "..tonum(state:sub(5,5)).."/"..NUM_HELP_SCRS,_,0,hc)
-		pgsc("H >>",_,16,hc,false)
+		pgsc("(Any key) >>",_,16,hc,false)
 		if state=="help1" then
 			pgsc("Screen",1,1,hc)
 			pgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,true)
 			spr(256,2*8,5*8+5,0,1,0,0,8,5)
 		elseif state=="help2" then
-			pgsc("Controls",1,1,hc)
+			pgsc("Keyboard",1,1,hc)
 			pgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,true)
-			pgsc("Mouse editing",1,12,hc)
+			pgsc("Mouse",1,12,hc)
 			pgs(help_strs[3]:gsub('\t',''),2,13,tc,sc,true)
 		elseif state=="help3" then
 			pgsc("Tools",1,1,hc)
