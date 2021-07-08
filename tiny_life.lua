@@ -726,44 +726,41 @@
 				function(...)ui.push_render_step("prints",{...})end,
 				prints
 			)
-		--[[ print with outline                    001 ]]
+		--[[ print with outline                     001 ]]
 			ui.add_render_step("printo",
 				function(...)ui.push_render_step("printo",{...})end,
 				printo
 			)
-
-		--[[ nframe rendering                       002 ]]
-			local function _draw_quad(x,y,w,h,u,v,u2,v2)
-				textri(x, y,   x+w,  y,    x+w, y+h,   u, v,   u2, v,    u2, v2)
-				textri(x, y,   x+w, y+h,   x,   y+h,   u, v,   u2, v2,    u, v2)
-			end
-			ui.add_render_step("nframe",
-				function(...)ui.push_render_step("nframe",{...})end,
-				function(x,y,w,h,i,bw,s)
-					i,bw,s=i or 0,bw or 3,s or 1
-
-					local x2,x3,y2,y3=x+bw,x+w-bw,y+bw,y+h-bw
-					local cw,ch=x3-x2,y3-y2  -- center w/h
-
-					local UVS=8*s -- uv size
-
-					local u,v=i%16*8,i//16*8
-					local u4,v4=u+UVS,v+UVS
-					local u2,v2,u3,v3=u+bw,v+bw,u4-bw,v4-bw
-
-					--          x   y      w   h      u1  v1     u2  v2
-					_draw_quad( x,  y,     bw, bw,    u,  v,     u2, v2 )  -- top left
-					_draw_quad( x3, y,     bw, bw,    u3, v,     u4, v2 )  -- top right
-					_draw_quad( x,  y3,    bw, bw,    u,  v3,    u2, v4 )  -- bottom left
-					_draw_quad( x3, y3,    bw, bw,    u3, v3,    u4, v4 )  -- bottom right
-
-					_draw_quad( x,  y2,    bw, ch,    u,  v2,    u2, v3 )  -- left
-					_draw_quad( x3, y2,    bw, ch,    u3, v2,    u4, v3 )  -- right
-
-					_draw_quad( x2, y,     cw, bw,    u2, v,     u3, v2 )  -- top
-					_draw_quad( x2, y3,    cw, bw,    u2, v3,    u3, v4 )  -- bottom
-
-					_draw_quad( x2, y2,    cw, ch,    u2, v2,    u3, v3 )  -- center
+		--[[ tiled1 rendering (from 3x1 sprs)       005 ]]
+			ui.add_render_step("tiled1",
+				function(...)ui.push_render_step("tiled1",{...})end,
+				function(idx,x,y,w,h,ac)
+					local i1,i2,flp,tw,th=idx+1,idx+2,false,w//8,h//8
+					clip(x+8,y+8,w-16,h-16)-- fill background
+						for j=0,th do
+							for i=0,tw do
+								spr(i2,x+i*8, y+j*8,ac,1,flp,0)
+							end
+						end
+					clip()
+					clip(x+8,y,w-16+1,h)-- horizontal borders
+						for i=0,tw do
+							spr(i1,x+i*8,y,ac,1,flp,0)
+							spr(i1,x+i*8,y+h-8,ac,1,flp,2)
+						end
+					clip()
+					clip(x,y+8,w,h-16+1)-- vertical borders
+						for j=0,th do
+							spr(i1,x,y+j*8,ac,1,flp,3)
+							spr(i1,x+w-8,y+j*8,ac,1,flp,1)
+						end
+					clip()
+					clip(x,y,w,h)-- corners
+						spr(idx,x,y,ac,1,flp,0)  -- tl
+						spr(idx,x+w-8,y,ac,1,flp,1)  -- tr
+						spr(idx,x+w-8,y+h-8,ac,1,flp,2)  -- br
+						spr(idx,x,y+h-8,ac,1,flp,3)  -- br
+					clip()
 				end
 			)
 --=--=--=--=--=--=--=--=--=--=--=--=--
@@ -1023,7 +1020,7 @@ end
 
 	function PlaybackBar(id,r,op)
 		ui.with_item("pb",r.x,r.y,r.w,r.h,op,function(t)
-			ui.nframe(r.x,r.y,r.w,r.h,3)
+			ui.tiled1(10,r.x,r.y,r.w,r.h,0)
 			local b1,b2,b3,b4,b5,b6,b7,b8,b9
 
 			b1=Button("b_rand",2,1,16, {tip="Randomize cells"}   )
@@ -1069,7 +1066,7 @@ end
 	local tl_types={"brush","rect","circ","line","fill","patt","copy","cut","paste"}
 	function Toolbar(id,r,op)
 		ui.with_item("tb",r.x,r.y,r.w,r.h,op,function(t)
-			ui.nframe(r.x,r.y,r.w,r.h,3)
+			ui.tiled1(10,r.x,r.y,r.w,r.h,0)
 			local ttp,cb,brt,btns=tl.type,#tl.clipboard>0,tl.brush_mode
 			btns={
 					TLButton("b_brush",1,1,112,ttp=="brush",{tip="Brush tool"}),
