@@ -32,45 +32,13 @@
 		CTRL=63,SHFT=64,ALT=65,
 		UP=58,DOWN=59,LEFT=60,RIGHT=61,
 	}
-	--[[ Debug drawing stuff                   003 ]]
-		-- TODO: add a grid-step choice
-		local function draw_dbg_grid(c)
-			c=c or 12
-			for i=0,240,8 do line(i,0,i,136,c)end
-			for j=0,136,8 do line(0,j,240,j,c)end
-		end
-		local function draw_dbg_center_lines(c)
-			c=c or 15
-			line(240/2,0,240/2,136,c)
-			line(0,136/2,240,136/2,c)
-		end
+	--[[ tracef - trace formatted              001 ]] function tracef(...) trace(fmt(...)) end
+	--[[ tracec - trace csv arguments          003 ]] function tracec(...) local t={} for i=1,select("#",...)do t[i]=tostr(select(i,...)) end trace(conc(t,",")) end
+	--[[ trace1d - trace a 1D array            001 ]] local function trace1d(t) local s=""for i,v in ipairs(t)do s=s..v..","end trace(s) end
+	--[[ trace2d - trace a 2d array            003 ]] function trace2d(a,sep,i0) sep=sep or""local s,c=i0 and i0 or 1 for j=s,#a do c={} for i=s,#a[i0] do c[i+1-s]=tostr(a[j][i]) end trace(conc(c,sep)) end end
 
-	--[[ trace2d - trace a 2d array            002 ]]
-		-- depends on conc   (common_shortenings.lua)
-		-- trace array 'a', with elements separated by 'sep'
-		-- set i0 to true if 'a' is 0-indexed
-		function trace2d(a,sep,i0)
-			sep=sep or""
-			local s,c=i0 and i0 or 1
-			for j=s,#a do
-				c={}
-				for i=s,#a[i0] do
-					c[i+1-s]=a[j][i]
-				end
-				trace(conc(c,sep))
-			end
-		end
-	--[[ array2 - make new 2d array with 'v'   002 ]]
-		function array2(w,h,v)
-			-- TODO: choice of 0-indexed or 1-indexed
-			v=v or 0
-			local t={}
-			for j=1,h do
-				t[j]={}
-				for i=1,w do t[j][i]=v end
-			end
-			return t
-		end
+	--[[ array2 - make new 2d array with 'v'   002 ]] function array2(w,h,v) v=v or 0 local t={} for j=1,h do t[j]={} for i=1,w do t[j][i]=v end end return t end
+
 	--[[ rotate/flip 2d arrays (WIP)           000 ]]
 		function rot90(inp)
 			local w,h=#inp[1],#inp
@@ -119,17 +87,7 @@
 		-- foo = vflip(foo,1) trace2d(foo,'',1)  -- 90
 
 	--[[ sdist - distance squared              001 ]] local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
-	--[[ tm_check - time stuff / dt            003 ]]
-		-- call 'tsecs' without args to get current time in secs
-		-- call 'tm_check' at the start of every frame to update t/dt/t2
-		local f,t1,t2,dt,tsecs,tm_check=0,time()
-		function tsecs(ms) return (ms or time())/1000 end
-		function tm_check()
-			f=f+1
-			t2=time()
-			dt=(t2-t1)/1000
-			t1=t2
-		end
+	--[[ tm_check - time stuff / dt            003 ]] local f,t1,t2,dt,tsecs,tm_check=0,time() function tsecs(ms) return (ms or time())/1000 end function tm_check() f=f+1 t2=time() dt=(t2-t1)/1000 t1=t2 end
 	--[[ has - check if 'o' is in table 't'    001 ]] local function has(t,o) for i=1,#t do if t[i]==o then return true end end end
 	--[[ dmerge - merge dict/hash tables       001 ]] local function dmerge(a,b,err,...) local has,type=has,type err=err or"Key '%s' already exists in table."local t={} for k,v in pairs(a)do if type(k)~="number"then t[k]=v end end for k,v in pairs(b)do if type(k)~="number" then if has(t,k)then print(fmt(err,...or k)) else t[k]=v end end end return t end
 
@@ -139,76 +97,13 @@
 	--[[ lerp - linear interpolate             002 ]] local function lerp(a,b,t)return a*(1-t)+b*t end
 
 	--[[ txtw - get text width                 002 ]] local function txtw(tx,fw,s,sf) return print(tx,0,-99,-1,fw or false,s or 1,sf or false) end
-	--[[ prints - print with shadow            003 ]]
-		local function prints(tx,x,y,c,sc,fw,s,sf)
-			fw,s,sc,sf=fw or false,s or 1,sc or 1,sf or false
-			print(tx,x+1,y+1,sc,fw,s,sf)
-			print(tx,x,y,c,fw,s,sf)
-		end
-	--[[ printgs - print on grid with shadow   009 ]]
-		local function printgs(t,x,y,c,sc,fw,s,ox,oy)
-			fw,s,sc=fw or false,s or 1,sc or 1
-			x,y=x*8+1+(ox or 0),y*8+1+(oy or 0)
-			print(t,x+1,y+1,sc,fw,s)
-			print(t,x,y,c,fw,s)
-		end
+	--[[ prints - print with shadow            003 ]] local function prints(tx,x,y,c,sc,fw,s,sf) fw,s,sc,sf=fw or false,s or 1,sc or 1,sf or false print(tx,x+1,y+1,sc,fw,s,sf) print(tx,x,y,c,fw,s,sf) end
+	--[[ printgs - print on grid with shadow   009 ]] local function printgs(t,x,y,c,sc,fw,s,ox,oy) fw,s,sc=fw or false,s or 1,sc or 1 x,y=x*8+1+(ox or 0),y*8+1+(oy or 0) print(t,x+1,y+1,sc,fw,s) print(t,x,y,c,fw,s) end
 	--[[ printgsc - print grid/shadow/centered 010 ]] local function printgsc(tx,x,y,c,sc,fw,s) fw,s,sc=fw or false,s or 1,sc or 1 if not x then x=(240//8)//2-(txtw(tx)//8)//2 end if not y then y=(136//8)//2 end print(tx,x*8+1,y*8+1,sc,fw,s) print(tx,x*8,y*8,c,fw,s) end
-	--[[ printgo - print grid/outline          001 ]]
-		local function printgo(tx,x,y,c,oc)
-			x,y=x*8,y*8
-			for j=y-1,y+1 do
-				for i=x-1,x+1 do
-					print(tx,i,j,oc)
-				end
-			end
-			print(tx,x,y,c)
-		end
-	--[[ printo - print with outline           003 ]]
-		-- Use whichever version is preferable. The second one
-		-- can be tweaked to only do diagonals or sides, making
-		-- a thinner outline.
-		local function printo(tx,x,y,c,oc,fw,s,sf)
-			fw,s,oc,sf=fw or false,s or 1,oc or 1,sf or false
-			for j=y-1,y+1 do
-				for i=x-1,x+1 do
-					print(tx,i,j,oc,fw,s,sf)
-				end
-			end
-			print(tx,x,y,c,fw,s,sf)
-		end
+	--[[ printo - print with outline           003 ]] local function printo(tx,x,y,c,oc,fw,s,sf) fw,s,oc,sf=fw or false,s or 1,oc or 1,sf or false for j=y-1,y+1 do for i=x-1,x+1 do print(tx,i,j,oc,fw,s,sf) end end print(tx,x,y,c,fw,s,sf) end
 
-	--[[ string.split - split string at 'sp'   001 ]]
-		-- split string by delimiter 'sp'
-		-- TODO: iirc this had some edge case issues
-		local _DEF_PAT,_L_PAT,_R_PAT='([^, ]+)','([^',']+)'
-		-- 'sp' is a string that lists separators to be used
-		function string.split(s,sp)
-			local t={}
-			if sp=="" then
-				for i=1,#s do
-					t[#t+1]=s:sub(i,i)
-				end
-			else
-				sp=sp and _L_PAT..sp.._R_PAT or _DEF_PAT
-				for word in s:gmatch(sp)do
-					t[#t+1]=word
-				end
-			end
-			return t
-		end
+	--[[ string.split - split string at 'sp'   001 ]] local _DEF_PAT,_L_PAT,_R_PAT='([^, ]+)','([^',']+)'function string.split(s,sp) local t={} if sp=="" then for i=1,#s do t[#t+1]=s:sub(i,i) end else sp=sp and _L_PAT..sp.._R_PAT or _DEF_PAT for word in s:gmatch(sp)do t[#t+1]=word end end return t end
 
-	--[[ tracef - trace formatted              001 ]] function tracef(...) trace(fmt(...)) end
-	--[[ tracec - trace csv arguments          003 ]] function tracec(...) local t={} for i=1,select("#",...)do t[i]=tostr(select(i,...)) end trace(conc(t,",")) end
-
-	--[[ trace1d - trace a 1D array            001 ]]
-		local function trace1d(t)
-			-- TODO: couldn't this just use table.concat, like 'trace2d' does?
-			local s=""
-			for i,v in ipairs(t)do
-				s=s..v..","
-			end
-			trace(s)
-		end
 	--[[ Vector2 (stripped)             (0.02) ]]
 		local _VECMT,vecv,vec0,vec2={}
 		_VECMT={
@@ -720,7 +615,7 @@
 			return false
 		end
 
-	--[[ TICkle Extensions                      006 ]]
+	--[[ TICkle Extensions                      007 ]]
 		--[[ print with shadow rendering            001 ]]
 			ui.add_render_step("prints",
 				function(...)ui.push_render_step("prints",{...})end,
@@ -916,7 +811,7 @@ end
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
-	local pb_rect={x=240//2-76//2,  y=-2,            w=76,  h=10}
+	local pb_rect={x=240//2-76//2,  y=-2,             w=76,  h=10}
 	local tb_rect={x=-2,            y=136//2-100//2,  w=10,  h=100}
 	local thm={
 		bg=15,
@@ -1107,10 +1002,6 @@ end
 			if b1.pressed then val=wrap(val-step,min,max)end
 			if b2.pressed then val=wrap(val+step,min,max)end
 			if t.val~=val then
-				if val<t.val then t.decreased=true
-				elseif val>t.val then t.increased=true
-				end
-				t.val_changed=true
 				t.val=val
 			end
 			t:exec()
@@ -1261,41 +1152,39 @@ end
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Geometry stuff
-	local function point(x,y)
-		return {x=x,y=y}
-	end
 
 	local geom={}
 	geom={
+		p=function(x,y)return{x=x,y=y}end,
 		--TODO: these functiosn shouldn't draw anything,
 		--      they should just return a list of points
 		_rect_hollow=function(r)
-			local t={}
+			local t,p={},geom.p
 			for j=r.y,r.y2 do
-				t[#t+1]=point(r.x,j)
-				t[#t+1]=point(r.x2,j)
+				t[#t+1]=p(r.x,j)
+				t[#t+1]=p(r.x2,j)
 			end
 			for i=r.x,r.x2 do
-				t[#t+1]=point(i,r.y)
-				t[#t+1]=point(i,r.y2)
+				t[#t+1]=p(i,r.y)
+				t[#t+1]=p(i,r.y2)
 			end
 			return t
 		end,
 		_rect_filled=function(r)
-			local t={}
+			local t,p={},geom.p
 			for j=r.y,r.y2 do
 				for i=r.x,r.x2 do
-					t[#t+1]=point(i,j)
+					t[#t+1]=p(i,j)
 				end
 			end
 			return t
 		end,
 		_circle_filled=function(x,y,x1,y1,x2,y2,r)
-			local t,R={},r*r
+			local t,p,R={},geom.p,r*r
 			for j=y-r,y+r do
 				for i=x-r,x+r do
 					if sdist(i,j,x,y)<=R+1 then
-						t[#t+1]=point(i,j)
+						t[#t+1]=p(i,j)
 					end
 				end
 			end
@@ -1419,7 +1308,7 @@ end
 	end
 
 	function tl._brush_pts(t,x,y)
-		local path=t.mode and Bres.line(g_lmx,g_lmy,x,y) or {point(x,y)}
+		local path=t.mode and Bres.line(g_lmx,g_lmy,x,y) or {geom.p(x,y)}
 		local set,pts,R,p,xmin,ymin,xmax,ymax={},{},t.brush_size
 		for i=1,#path do
 			p=path[i]
@@ -1472,13 +1361,9 @@ end
 	end
 
 	function tl.show_info(t)
-		local w,h,x,y=txtw(t.info,true,1,true),8,mx+2,my-6
-
-		if x+w>240 then x=min(mx-w,240-w) end
-		if y+h>136 then y=136-h end
-		if x<0 then x=0 end
-		if y<0 then y=0 end
-
+		local w,h,x,y=txtw(t.info,true,1,true),8
+		x=clamp(mx+2,0,240-w)
+		y=clamp(my-6,0,136-h)
 		ui.printo(t.info,x,y,thm.dim_text,thm.outl,true,1,true)
 	end
 
@@ -1997,7 +1882,7 @@ end
 			Label("l5",34,tx+1+32,"Enable tooltips",tc,lbt)
 
 			Spinbox("sp1",16,tx+48,opts[ZOOM_LVL],1,4,1,function(t)
-				if t.val_changed then set_zoom(t.val,true)end
+				if t.val then set_zoom(t.val,true)end
 			end)
 			Label("l4",40,tx+48,"Zoom level",tc,lbt)
 
@@ -2216,7 +2101,6 @@ bma("Total",function()--@bm
 	render()
 
 	ui.end_frame()
-	-- draw_dbg_center_lines(14)
 	dbg:draw()
 end)--@bm
 end
