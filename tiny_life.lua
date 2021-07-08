@@ -44,6 +44,58 @@
 			line(240/2,0,240/2,136,c)
 			line(0,136/2,240,136/2,c)
 		end
+
+	--[[ trace2d - trace a 2d array            002 ]]
+		-- depends on conc   (common_shortenings.lua)
+		-- trace array 'a', with elements separated by 'sep'
+		-- set i0 to true if 'a' is 0-indexed
+		function trace2d(a,sep,i0)
+			sep=sep or""
+			local s,c=i0 and i0 or 1
+			for j=s,#a do
+				c={}
+				for i=s,#a[i0] do
+					c[i+1-s]=a[j][i]
+				end
+				trace(conc(c,sep))
+			end
+		end
+	--[[ array2 - make new 2d array with 'v'   002 ]]
+		function array2(w,h,v)
+			-- TODO: choice of 0-indexed or 1-indexed
+			v=v or 0
+			local t={}
+			for j=1,h do
+				t[j]={}
+				for i=1,w do t[j][i]=v end
+			end
+			return t
+		end
+	--[[ rotate 2d arrays (WIP)                000 ]]
+		function rot90(inp)
+			local w,h=#inp[1],#inp
+			local out=array2(h,w)
+			for j=1,h do
+				for i=1,w do
+					out[i][h+1-j]=inp[j][i]
+				end
+			end
+			return out
+		end
+		function rotate(a,n)
+			n=n%4
+			if n>0 then
+				for i=1,n do a=rot90(a)end
+			end
+			return a
+		end
+		-- local foo={
+		-- 	{1,2,3,4},
+		-- 	{5,6,7,8},
+		-- }
+		-- foo = rotate(foo,-1) trace2d(foo,'',1)  -- 90
+		-- foo = rotate(foo,1) trace2d(foo,'',1)  -- 90
+
 	--[[ sdist - distance squared              001 ]] local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
 	--[[ tm_check - time stuff / dt            003 ]]
 		-- call 'tsecs' without args to get current time in secs
@@ -780,8 +832,8 @@
 		 3
 		                4 Pattern category/name
 
-		                5 Mouse position
-		 4
+		      4         5 Mouse position
+
 		                6 Zoom level
 		   5 6 7   8
 		                7 Speed meter
@@ -789,19 +841,19 @@
 		                8 Cells alive|dead/total
 		]],
 		[[
-			H         Show help
-			O         Toggle Options
+			H/O       Show help/Options
 			SPACE     Pause/play
-			  +SHIFT  Reset (stop)
-			ENTER     Randomize cells
-			SHIFT+C/F Revive/kill all cells
+			  +SHIFT  Stop (reset)
+			ENTER     Randomize board
+			SHIFT+C/F Clear/fill board
 			G         Next generation (if paused)
 			TAB/I/T   Toggle UI/info/toolbars
-			PG-UP/DN  Zoom in/out (resets cells)
-			Up/Down   inc/decrease speed by 1
-			  +SHIFT  inc/decrease speed
+			PG-UP/DN  Zoom in/out (clears board)
+			Up/Down   inc/decrease speed by 1%
+			  +SHIFT  fast inc/decrease speed
 			P         Toggle padding (if zoom>2)
-			Ctrl+S/L  Save/Load board state
+			Ctrl+S/L  Save/load board state
+			Q/E       Rotate pattern/clipboard
 		]],
 		[[
 			Mouse1(L) Drawing/cancel erasing
@@ -836,6 +888,11 @@
 
 -- fwd decls
 local tl,rand_cells
+
+local function inbounds(x,y)
+	return x>0 and x<=GW and y>0 and y<=GH
+end
+
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
@@ -1139,7 +1196,7 @@ local tl,rand_cells
 			pts[#pts+1]={x=x,y=y}
 		end
 
-		_p(x,y) -- add the initial point
+		_p(x,y) -- add initial point
 
 		local s,c,pt,set_abv,set_blw,sy=cells[dum],cells[cur]
 		repeat
@@ -1180,10 +1237,8 @@ local tl,rand_cells
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
-	--[[ Bounds checking                       003 ]]
-		local function inbounds(x,y)
-			return x>0 and x<=GW and y>0 and y<=GH
-		end
+
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Geometry stuff
 	local function point(x,y)
@@ -1466,9 +1521,21 @@ local tl,rand_cells
 		end
 	end
 
+	function tl.rot(t,n)
+		local a
+		if tl.type=="patt"then
+			a=t.patts[t.cur_cat][t.cur_patt].layout
+			t.patts[t.cur_cat][t.cur_patt].layout=rotate(a,n)
+		elseif tl.type=="paste"then
+			a=t.clipboard
+			t.clipboard=rotate(a,n)
+		end
+		t.do_update=true
+	end
+
 	function tl._paste_pts(t,x,y)
 		local s,p,gy,sj,pj,gx=cells[dum],t.clipboard
-		local w,h=#p[0],#p
+		local w,h=#p[1],#p
 		for j=1,h do
 			gy=j+(y-1)-h
 			if gy>0 and gy<=GH then
@@ -1926,6 +1993,8 @@ local tl,rand_cells
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
+
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- input
 	local function handle_keys()
@@ -1959,6 +2028,8 @@ local tl,rand_cells
 				elseif keyp(k.T)then toggle_toolbars()
 				elseif keyp(k.TAB)then toggle_ui()
 				elseif keyp(k.I)then toggle_info()
+				elseif keyp(k.Q)then tl:rot(-1)
+				elseif keyp(k.E)then tl:rot(1)
 				elseif keyp(k.C)then
 					if shift then fill_grid(false)
 					else tl:switch(ctrl and"copy"or"circ")
