@@ -661,7 +661,8 @@
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
 	-- in-game persistent options / load values or defaults
-	local webv,opts,PALM=false,{true,true,true,false,2,[9]=true},0x03FC0
+	local webv=false
+	local opts,PALM={true,true,true,false,(webv and 2 or 1),[9]=true},0x03FC0
 	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,FG_R,FG_G,FG_B,USE_TLTIPS,BG_R,BG_G,BG_B=1,2,3,4,5,6,7,8,9,10,11,12
 
 	-- original cell color = da7100 | 218,113,0
@@ -876,7 +877,7 @@ end
 			if i.id~=oid or i.pressed then t.timer=t.delay
 			elseif t.timer>0          then t.timer=t.timer-dt
 			else
-				tw=txtw(i.tip,_,_,true)+3
+				tw=txtw(i.tip,true,_,true)
 				ui.rect(mx+2,my+4,tw,8,5)
 				ui.print(i.tip,mx+4,my+5,1,false,1,true)
 			end
