@@ -1,13 +1,27 @@
 # Tiny Life
 A toy Game Of Life for the TIC-80
 
-I had a bunch of fun doing this, and also learned quite a lot. It became quite more than I initially intended. It took quite more code than I was expecting.
+I had a bunch of fun doing this, and also learned quite a lot. It became quite more than I initially intended, and took way more code than I expected.
 
-The code turned out cryptic in some places, because I kept hitting my head on the 64k limit from TIC 0.70.6, as well as having performance problems, so I had to shorten stuff dramatically and also resort to optimizations that added to the complexity of the code. There's also some indentation shenanigans going on in there that one may find strange. This is because my brain (and my mouse wheel) explodes when editing too much code in one file, so I had to find a way to stay organized. I separated the code into sections, indented their content, and that gives me the ability to fold the sections in Sublime (I don't know if that works in other editors).
+The code is a bit cryptic because I kept hitting on the 64k token limit, and also having performance problems. So I had to shorten things dramatically and also resort to optimizations that make the code harder to read. There's also some indentation shenanigans going on in there that one may find strange. This is because my brain (and my mouse wheel) explodes when editing too much code in one file, so I had to find a way to stay organized. Separating the code into indented sections allows me to fold the code and make it more manageable.
 
-On the bright side, I learned a lot about how to optimize lua. While the older version used to run at 15-20fps on my end, the new version runs at 45-55fps. 
+####Since TIC version 0.80 is slower than 0.70, I'm still developing this in 0.70. The problem is fixed in 0.90, so I will update to it when it comes out, and make the code more readable.
 
-There are still some things I want to add to it. It's by no means finished. I think there may still be a little room for more optimizations, but mostly there's a few features I didn't get to work on yet (listed in the TODO), which I'd really like to.
 
-I will come back to it as I have time or patience.
+## Changelog (didn't keep track of it until 1.3)
 
+### version 1.3
+ - improved performance (with border swapping), to a mostly stable 60 fps
+ - overhauled/streamlined the UI (this gave me a lot more token budget)
+ - fixed brush drawing gaps (you can now draw continuous strokes)
+ - added a rounded mode to brush tool
+ - added copy/cut/paste from/to the board
+ - patterns and clipboard can now be rotated (Q/E) and flipped (A/Z)
+ - rect/circle sizes are shown while drawing
+ - the current state of the board can be saved and loaded. Reseting (pressing stop button) loads the saved state.
+ - backgrond and cell colors can be changed in options (and are persistent in the non-web version)
+ - added speed controls
+
+ - fixed annoying gaps that plagued flat ellipses
+ - fixxed problems that plagued rect/circle proportional/centered modes
+ - removed dead cells functionalities, as they were mostly useless/redundant and
