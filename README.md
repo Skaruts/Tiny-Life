@@ -21,6 +21,7 @@ The code is a bit cryptic because I kept hitting on the 64k token limit, and als
  - the current state of the board can be saved and loaded. Reseting (pressing stop button) loads the saved state.
  - backgrond and cell colors can be changed in options (and are persistent in the non-web version)
  - added speed controls
+ - improved the drawing tools (draw with left mouse button, erase with right mouse button)
 
  - fixed annoying gaps that plagued flat ellipses
  - fixxed problems that plagued rect/circle proportional/centered modes
