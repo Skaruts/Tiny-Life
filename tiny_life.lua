@@ -744,7 +744,7 @@
 	local g_mx,g_my,g_lmx,g_lmy=0,0,0,0 -- grid mouse pos
 	local ctrl,shift,alt=false,false,false
 
-	local pre,cur,dum=1,2,3 -- prev/curr/dummy buffer indices
+	local pre,cur,dum,sav=1,2,3,4 -- prev/curr/dummy,saved buffer indices
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 	local zoom_mults={8,4,2,1}
@@ -795,6 +795,7 @@
 			Up/Down   inc/decrease speed by 1
 			  +SHIFT  inc/decrease speed
 			P         Toggle padding (if zoom>2)
+			Ctrl+S/L  Save/Load board state
 		]],
 		[[
 			Mouse1(L) Drawing/cancel erasing
@@ -821,7 +822,7 @@
 			2         Statics
 			3         Oscilators
 			4         Amusing/Explosive
-			5         Gliders
+			5         Spaceships
 			6         Guns
 		]]
 	}
@@ -1607,35 +1608,51 @@ local tl,rand_cells
 	function rand_cells(rst)
 		l_cells=0
 		if rst then pause(true)end
-		local cc,b=cells[cur],0
+		local c,b=cells[cur],0
 		for j=1,GH do
-			ccj=cc[j]
 			for i=1,GW do
 				b=rand()<0.5 and 1 or 0
-				ccj[i]=b
+				c[j][i]=b
 				l_cells=l_cells+b
 			end
 		end
 	end
 
 	function create_cells()
-		local b1,b2,b3={},{},{}
+		local b1,b2,b3,b4={},{},{},{}
 		for j=0,GH+1 do
-			b1[j],b2[j],b3[j]={},{},{}
+			b1[j],b2[j],b3[j],b4[j]={},{},{},{}
 			for i=0,GW+1 do
-				b1[j][i],b2[j][i],b3[j][i]=0,0,0
+				b1[j][i],b2[j][i],b3[j][i],b4[j][i]=0,0,0,0
 			end
 		end
-		cells={b1,b2,b3}
+		cells={b1,b2,b3,b4}
 		TOT_CELLS=GW*GH
 	end
 
+	function save_board()
+		local c,sv=cells[cur],cells[sav]
+		for j=1,GH do
+			for i=1,GW do
+				sv[j][i]=c[j][i]
+			end
+		end
+	end
+
+	function load_board()
+		local c,sv=cells[cur],cells[sav]
+		for j=1,GH do
+			for i=1,GW do
+				c[j][i]=sv[j][i]
+			end
+		end
+	end
+
 	function fill_grid(fill)
-		local cc,v,ccj=cells[cur],fill and 1 or 0
+		local c,v=cells[cur],fill and 1 or 0
 		for j=0,GH+1 do
-			ccj=cc[j]
 			for i=0,GW+1 do
-				ccj[i]=v
+				c[j][i]=v
 			end
 		end
 		l_cells=(fill and GW*GH or 0)
@@ -1801,26 +1818,26 @@ local tl,rand_cells
 
 	local function draw_help()
 		cls(0)
-		local pgsc,pgs,tc,hc,sc=printgsc,printgs,thm.text,thm.header,thm.shad
+		local pgsc,pgs,tc,hc,sc,fw=printgsc,printgs,thm.text,thm.header,thm.shad,true
 		pgsc("Help "..tonum(state:sub(5,5)).."/"..NUM_HELP_SCRS,_,0,hc)
 		pgsc("(Any key) >>",_,16,hc,false)
 		if state=="help1" then
 			pgsc("Screen",1,1,hc)
-			pgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,true)
+			pgs(help_strs[1]:gsub('\t',''),0,2,tc,sc,fw)
 			spr(256,2*8,5*8+5,0,1,0,0,8,5)
 		elseif state=="help2" then
 			pgsc("Keyboard",1,1,hc)
-			pgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,true)
-			pgsc("Mouse",1,12,hc)
-			pgs(help_strs[3]:gsub('\t',''),2,13,tc,sc,true)
+			pgs(help_strs[2]:gsub('\t',''),2,2,tc,sc,fw)
+			pgsc("Mouse",1,13,hc)
+			pgs(help_strs[3]:gsub('\t',''),2,14,tc,sc,fw)
 		elseif state=="help3" then
 			pgsc("Tools",1,1,hc)
-			pgs(help_strs[4]:gsub('\t',''),2,2,tc,sc,true)
+			pgs(help_strs[4]:gsub('\t',''),2,2,tc,sc,fw)
 			pgsc("Tool modes",1,10,hc)
-			pgs(help_strs[5]:gsub('\t',''),2,11,tc,sc,true)
+			pgs(help_strs[5]:gsub('\t',''),2,11,tc,sc,fw)
 		elseif state=="help4" then
 			pgsc("Pattern Categories",1,2,hc)
-			pgs(help_strs[6]:gsub('\t',''),2,3,tc,sc,true)
+			pgs(help_strs[6]:gsub('\t',''),2,3,tc,sc,fw)
 		end
 	end
 
@@ -1881,25 +1898,6 @@ local tl,rand_cells
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
--- function inc_color()
--- 	local i=PALM+8*3
--- 	local r,g,b=
--- 		wrap(peek(i  )-1,0,255),
--- 		wrap(peek(i+1)-1,0,255),
--- 		wrap(peek(i+2)-1,0,255)
--- 	set_cell_color({r,g,b})
--- end
-
--- function dec_color()
--- 	local i=PALM+8*3
--- 		local r,g,b=
--- 		wrap(peek(i  )+1,0,255),
--- 		wrap(peek(i+1)+1,0,255),
--- 		wrap(peek(i+2)+1,0,255)
--- 	set_cell_color({r,g,b})
--- end
-
-
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- input
 	local function handle_keys()
@@ -1927,8 +1925,6 @@ local tl,rand_cells
 				elseif shift and key(k.DOWN)then dec_speed()
 				elseif keyp(k.UP)then inc_speed()
 				elseif keyp(k.DOWN)then dec_speed()
-				-- elseif key(k.LEFT)                  then inc_color()
-				-- elseif key(k.RIGHT)                 then dec_color()
 				elseif keyp(k.O)then toggle_options()
 				elseif keyp(k.H)then toggle_help()
 				elseif keyp(k.P)then toggle_padding()
@@ -1945,7 +1941,10 @@ local tl,rand_cells
 					if tp~="brush"then tl:switch("brush")
 					else tl:toggle_brush()
 					end
-				elseif keyp(k.L)then tl:switch("line")
+				elseif keyp(k.L)then
+					if ctrl then load_board()
+					else tl:switch("line")
+					end
 				elseif keyp(k.R)then tl:switch("rect")
 				elseif keyp(k.F)then
 					if shift then fill_grid(true)
@@ -1956,7 +1955,8 @@ local tl,rand_cells
 					elseif tp=="patt"then tl:next_pattern()
 					end
 				elseif keyp(k.S,10,5)then
-					if tp=="brush"then tl:contract()
+					if ctrl then save_board()
+					elseif tp=="brush"then tl:contract()
 					elseif tp=="patt"then tl:prev_pattern()
 					end
 				else
@@ -2061,7 +2061,8 @@ local tl,rand_cells
 
 	function reset()
 		gens = 0
-		fill_grid(false)
+		-- fill_grid(false)
+		load_board()
 		stopped=true
 	end
 
