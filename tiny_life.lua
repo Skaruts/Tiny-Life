@@ -71,7 +71,7 @@
 			end
 			return t
 		end
-	--[[ rotate 2d arrays (WIP)                000 ]]
+	--[[ rotate/flip 2d arrays (WIP)           000 ]]
 		function rot90(inp)
 			local w,h=#inp[1],#inp
 			local out=array2(h,w)
@@ -89,12 +89,34 @@
 			end
 			return a
 		end
+		function hflip(inp)
+			local w,h=#inp[1],#inp
+			local out=array2(w,h)
+			for j=1,h do
+				for i=1,w do
+					out[j][w+1-i]=inp[j][i]
+				end
+			end
+			return out
+		end
+		function vflip(inp)
+			local w,h=#inp[1],#inp
+			local out=array2(w,h)
+			for j=1,h do
+				for i=1,w do
+					out[h+1-j][i]=inp[j][i]
+				end
+			end
+			return out
+		end
 		-- local foo={
 		-- 	{1,2,3,4},
 		-- 	{5,6,7,8},
 		-- }
+		-- trace2d(foo,'',1)
 		-- foo = rotate(foo,-1) trace2d(foo,'',1)  -- 90
-		-- foo = rotate(foo,1) trace2d(foo,'',1)  -- 90
+		-- foo = hflip(foo,1) trace2d(foo,'',1)  -- 90
+		-- foo = vflip(foo,1) trace2d(foo,'',1)  -- 90
 
 	--[[ sdist - distance squared              001 ]] local function sdist(x1,y1,x2,y2)local a,b=x1-x2,y1-y2 return a*a+b*b end
 	--[[ tm_check - time stuff / dt            003 ]]
@@ -841,7 +863,7 @@
 		                8 Cells alive|dead/total
 		]],
 		[[
-			H/O       Show help/Options
+			H/O       Show help/options
 			SPACE     Pause/play
 			  +SHIFT  Stop (reset)
 			ENTER     Randomize board
@@ -853,7 +875,8 @@
 			  +SHIFT  fast inc/decrease speed
 			P         Toggle padding (if zoom>2)
 			Ctrl+S/L  Save/load board state
-			Q/E       Rotate pattern/clipboard
+			Q/E       Rotate pattern|clipboard
+			A/Z       Flip pattern|clipboard h/v
 		]],
 		[[
 			Mouse1(L) Drawing/cancel erasing
@@ -1530,7 +1553,18 @@ end
 			a=t.clipboard
 			t.clipboard=rotate(a,n)
 		end
-		t.do_update=true
+		if a then t.do_update=true end
+	end
+	function tl.flip(t,d)
+		local a
+		if tl.type=="patt"then
+			a=t.patts[t.cur_cat][t.cur_patt].layout
+			t.patts[t.cur_cat][t.cur_patt].layout=d=="v"and vflip(a)or hflip(a)
+		elseif tl.type=="paste"then
+			a=t.clipboard
+			t.clipboard=d=="v"and vflip(a)or hflip(a)
+		end
+		if a then t.do_update=true end
 	end
 
 	function tl._paste_pts(t,x,y)
@@ -2030,6 +2064,8 @@ end
 				elseif keyp(k.I)then toggle_info()
 				elseif keyp(k.Q)then tl:rot(-1)
 				elseif keyp(k.E)then tl:rot(1)
+				elseif keyp(k.A)then tl:flip("h")
+				elseif keyp(k.Z)then tl:flip("v")
 				elseif keyp(k.C)then
 					if shift then fill_grid(false)
 					else tl:switch(ctrl and"copy"or"circ")
