@@ -112,12 +112,12 @@
 			local t={}
 			if sp=="" then
 				for i=1,#s do
-				    t[#t+1]=s:sub(i,i)
+					t[#t+1]=s:sub(i,i)
 				end
 			else
 				sp=sp and _L_PAT..sp.._R_PAT or _DEF_PAT
 				for word in s:gmatch(sp)do
-				    t[#t+1]=word
+					t[#t+1]=word
 				end
 			end
 			return t
@@ -195,16 +195,17 @@
 				)
 			end,
 		}
-	--[[ Bresenham Stuff                       004 ]]
+	--[[ Bresenham Stuff                       005 ]]
 		local Bres={}
 		Bres={
+			_p=function(a,x,y)a[#a+1]={x=x,y=y}end,
 			line=function(x1,y1,x2,y2,exclude_start)
 				exclude_start=exclude_start or false
-				local pts,dtx,dty={},x2-x1,y2-y1
+				local pts,p,dtx,dty={},Bres._p,x2-x1,y2-y1
 				local ix,iy=dtx>0 and 1or-1,dty>0 and 1or-1
 				dtx,dty=2*abs(dtx),2*abs(dty)
 				if not exclude_start then
-					pts[#pts+1]={x=x1,y=y1}
+					p(pts,x1,y1)
 				end
 				if dtx>=dty then
 					err=dty-dtx/2
@@ -213,7 +214,7 @@
 							err,y1=err-dtx,y1+iy
 						end
 						err,x1=err+dty,x1+ix
-						pts[#pts+1]={x=x1,y=y1}
+						p(pts,x1,y1)
 					end
 				else
 					err=dtx-dty/2
@@ -222,82 +223,74 @@
 							err,x1=err-dty,x1+ix
 						end
 						err,y1=err+dtx,y1+iy
-						pts[#pts+1]={x=x1,y=y1}
+						p(pts,x1,y1)
 					end
 				end
 				return pts
 			end,
 			-- not working properly
-			ellipse=function(xc,yc,w,h)
-				if w<=0 or h<=0 then return{}end
-				local pts,a2,b2,x,y,sig={},w*w,h*h,0,0,0
-				local p=function(x,y)pts[#pts+1]={x=x,y=y}end
-				local _put_pts=function(xc,yc,x,y)
-					p(xc+x,yc+y)
-					p(xc-x,yc+y)
-					p(xc+x,yc-y)
-					p(xc-x,yc-y)
-				end
+			ellipse=function(x0,y0,x1,y1)
+				-- from: http://members.chello.at/easyfilter/bresenham.html
+				local pts,p,a,b={},Bres._p,abs(x1-x0),abs(y1-y0) -- values of diameter
+				local b1=b&1
+				local dx,dy=4*(1-a)*b*b,4*(b1+1)*a*a -- error increment
+				local err=dx+dy+b1*a*a
+				local e2 -- error of 1.step
 
-				local fa2,fb2=4*a2,4*b2
+				if x0>x1 then x0,x1=x1,x1+a end -- if called with swapped points
+				if y0>y1 then y0=y1 end -- exchange them
+				y0=y0+(b+1)//2
+				y1=y0-b1   -- starting pixel
+				a,b1=a*(8*a),8*b*b
 
-				-- first half
-				x,y=0,h
-				sig=2*b2+a2*(1-2*h)
-				while b2*x<=a2*y do
-					_put_pts(xc,yc,x,y)
-					if sig>=0 then
-						sig=sig+fa2*(1-y)
-						y=y-1
+				repeat
+					p(pts,x1,y0) --   I. Quadrant
+					p(pts,x0,y0) --  II. Quadrant
+					p(pts,x0,y1) -- III. Quadrant
+					p(pts,x1,y1) --  IV. Quadrant
+					e2=2*err
+					if e2<=dy then  -- y step
+						y0,y1,dy=y0+1,y1-1,dy+a
+						err=err+dy
 					end
-					sig=sig+b2*((4*x)+6)
-					x=x+1
-				end
-				-- second half
-				x,y=w,0
-				sig=2*a2+b2*(1-2*w)
-				while a2*y<=b2*x do
-					_put_pts(xc,yc,x,y)
-					if sig>=0 then
-						sig=sig+fb2*(1-x)
-						x=x-1
+					if e2>=dx or 2*err>dy then  -- x step
+						x0,x1,dx=x0+1,x1-1,dx+b1
+						err=err+dx
 					end
-					sig=sig+a2*((4*y)+6)
-					y=y+1
-				end
+				until x0>x1
+
+				while y0-y1<b do
+					-- too early stop of flat ellipses a=1
+					p(pts,x0-1,y0) -- -> finish tip of ellipse
+					p(pts,x1+1,y0)
+					p(pts,x0-1,y1)
+					p(pts,x1+1,y1)
+					y0,y1=y0+1,y1-1
+			   end
+			   return pts
+			end,
+			circle_f=function(xc,yc,r)
+				-- filled circle
+				-- from: http://members.chello.at/~easyfilter/bresenham.html
+				local pts,p,x,y,err={},Bres._p,-r,0,1-2*r-- 2-2*r
+				repeat
+					for i=xc+x,xc do p(pts,i,yc-y)end
+					for i=xc+y,xc,-1 do p(pts,i,yc+x)end
+					for i=xc-y,xc do p(pts,i,yc-x)end
+					for i=xc-x,xc,-1 do p(pts,i,yc+y)end
+
+					r=err
+					if r<=y then
+						y=y+1
+						err=err+(y*2+1)
+					end
+					if r>x or err>y then
+						x=x+1
+						err=err+(x*2+1)
+					end
+				until x>=0
 				return pts
 			end,
-			circle=function(xc,yc,r)
-				-- TODO: test this
-				local pts={}
-				-- TODO: are inner functions like these bad?
-				local p=function(x,y)pts[#pts+1]={x=x,y=y}end
-				local circle=function(xc,yc,x,y)
-					p(xc+x,yc+y)
-					p(xc-x,yc+y)
-					p(xc+x,yc-y)
-					p(xc-x,yc-y)
-					p(xc+y,yc+x)
-					p(xc-y,yc+x)
-					p(xc+y,yc-x)
-					p(xc-y,yc-x)
-				end
-
-				local x,y,d=0,r,3-2*r
-
-				circle(xc,yc,x,y)
-				while y>=x do
-					x=x+1
-					if d>0 then
-						y=y-1
-						d=d+4*(x-y)+10
-					else
-						d=d+4*x+6
-					end
-					circle(xc,yc,x,y)
-				end
-				return pts
-			end
 		}
 	--[[ Mouse States                          007 ]]
 		local mx,my,mwx,mwy,lmx,lmy,rmx,rmy=0,0,0,0,0,0,0,0
@@ -307,20 +300,20 @@
 		function mbtn(b)
 			if b then return m_stt.curr[b]>0 end
 			return m_stt.curr[1]>0
-			    or m_stt.curr[2]>0
-			    or m_stt.curr[3]>0
+				or m_stt.curr[2]>0
+				or m_stt.curr[3]>0
 		end
 		function mbtnp(b)
 			if b then return m_stt.curr[b]==1 end
 			return m_stt.curr[1]==1
-			    or m_stt.curr[2]==1
-			    or m_stt.curr[3]==1
+				or m_stt.curr[2]==1
+				or m_stt.curr[3]==1
 		end
 		function mbtnr(b)
 			if b then return m_stt.prev[b]>0 and m_stt.curr[b]==0 end
 			return m_stt.prev[1]>0 and m_stt.curr[1]==0
-			    or m_stt.prev[2]>0 and m_stt.curr[2]==0
-			    or m_stt.prev[3]>0 and m_stt.curr[3]==0
+				or m_stt.prev[2]>0 and m_stt.curr[2]==0
+				or m_stt.prev[3]>0 and m_stt.curr[3]==0
 		end
 		function mbtnt(b)
 			if b then return m_stt.curr[b] end
@@ -697,21 +690,32 @@
 -- setup
 	-- in-game persistent options / load values or defaults
 	local webv,opts=false,{true,true,true,false,1,[9]=true}
-	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,CC_R,CC_G,CC_B,USE_TLTIPS=1,2,3,4,5,6,7,8,9
+	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,FG_R,FG_G,FG_B,USE_TLTIPS,BG_R,BG_G,BG_B=1,2,3,4,5,6,7,8,9,10,11,12
 
 	-- original cell color = da7100 | 218,113,0
 	local PALM=0x03FC0
 	local cell_col=webv and {peek(PALM+8*3),peek(PALM+8*3+1),peek(PALM+8*3+2)} or nil
+	local bg_col=webv and {peek(PALM+15*3),peek(PALM+15*3+1),peek(PALM+15*3+2)} or nil
+
 	function set_cell_color(c)
 		cell_col=c
-		local i,r,g,b=PALM+8*3,unpk(c)
+		set_color(8,c,FG_R,FG_G,FG_B)
+	end
+	function set_bg_color(c)
+		bg_col=c
+		set_color(15,c,BG_R,BG_G,BG_B)
+	end
+
+	function set_color(idx,c,ri,gi,bi)
+		local i,r,g,b=PALM+idx*3,unpk(c)
 		poke(i  ,r)
 		poke(i+1,g)
 		poke(i+2,b)
-
-		pmem(CC_R,r)
-		pmem(CC_G,g)
-		pmem(CC_B,b)
+		if not webv then
+			pmem(ri,r)
+			pmem(gi,g)
+			pmem(bi,b)
+		end
 	end
 
 	if not webv then
@@ -722,17 +726,18 @@
 		if pmem(USE_TLTIPS)  ~= 1 then opts[USE_TLTIPS]  = false end --tooltip
 		if pmem(ZOOM_LVL)==0 then pmem(ZOOM_LVL, opts[ZOOM_LVL]) end
 
-		local mr,mg,mb=pmem(CC_R),pmem(CC_G),pmem(CC_B)
+		local mr,mg,mb=pmem(FG_R),pmem(FG_G),pmem(FG_B)
 		set_cell_color({mr,mg,mb})
+
+		mr,mg,mb=pmem(BG_R),pmem(BG_G),pmem(BG_B)
+		set_bg_color({mr,mg,mb})
 	end
 
 	function toggle_opt(i) -- toggle value of an option and save it
 		local b=not opts[i]
-		pmem(i,b and 1 or 0)
 		opts[i]=b
-		if i == USE_PADDING then
-			set_padding(b)
-		end
+		if not webv then pmem(i,b and 1 or 0)end
+		if i==USE_PADDING then set_padding(b)end
 	end
 
 	local upd_delay=0
@@ -751,8 +756,8 @@
 	local cats={
 		"Statics",
 		"Oscilators",
-		"Amusing/Explosive",
-		"Gliders",
+		"Amusing",
+		"Spaceships",
 		"Guns",
 	}
 
@@ -830,7 +835,7 @@ local tl,rand_cells
 	local pb_rect={x=240//2-76//2,  y=-2,            w=76,  h=10}
 	local tb_rect={x=-2,            y=136//2-100//2,  w=10,  h=100}
 	local thm={
-		bg=0,
+		bg=15,
 		fg=13,
 		text=5,
 		shad=3,
@@ -901,24 +906,23 @@ local tl,rand_cells
 	end
 
 	function GenInfo()
-		-- ui.with_item("gi",x,y,w,h,nil,function(t)
 		if ui.visible then
-			local ty,tc,oc,cstr,tcstr,tstr=2,thm.text,thm.outl,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
-			printo("Gen: "..gens,2,ty,tc,oc,_,_,true)
+			local ty,tc,oc,fw,sf,cstr,tcstr,tstr=2,thm.text,thm.outl,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
+			printo("Gen: "..gens,2,ty,tc,oc,fw,_,sf)
 
 			ty=ty+8*15-1
 			if tl.type=="patt"then
-				printo(fmt("%s: %s",cats[tl.cur_cat],tl.cur_pat),2,ty,thm.dim_text,oc,_,_,true)
+				printo(fmt("%s: %s",cats[tl.cur_cat],tl.patts[tl.cur_cat][tl.cur_patt].name),2,ty,thm.dim_text,oc,fw,_,sf)
 			end
 			ty=ty+8
-			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,_,_,true)
-			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),40,ty,tc,oc,_,_,true)
-			printo("Speed:"..1-(1*(upd_delay/100)),70,ty,tc,oc,_,_,true)
+			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,fw,_,sf)
+			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),45,ty,tc,oc,fw,_,sf)
+			printo("Speed:"..1-(1*(upd_delay/100)),83,ty,tc,oc,fw,_,sf)
 
 			printo("Cells:"..rep(' ',6-#cstr)..cstr
-			     .."|"..rep(' ',6-#tcstr)..tcstr
-			     .."/"..rep(' ',6-#tstr)..tstr
-				,140,ty,tc,oc,false,_,true)
+				 .."|"..rep(' ',6-#tcstr)..tcstr
+				 .."/"..rep(' ',6-#tstr)..tstr
+				,135,ty,tc,oc,fw,_,sf)
 		end
 	end
 
@@ -956,7 +960,7 @@ local tl,rand_cells
 			b8=Button("b_opts",59,1,240,{tip="Show options"})
 			b9=Button("b_help",67,1,243,{tip="Show help"})
 
-			if b1.released then rand_cells()end
+			if b1.released then rand_cells(opts[RAND_RESET])end
 			if b2.released then inc_zoom()end
 			if b4.released then pause(true)end
 
@@ -977,7 +981,7 @@ local tl,rand_cells
 	function Toolbar(id,r,op)
 		ui.with_item("tb",r.x,r.y,r.w,r.h,op,function(t)
 			ui.nframe(r.x,r.y,r.w,r.h,3)
-			local ttp,cb,brt,btns=tl.type,#tl.clipboard>0,tl.brush_type
+			local ttp,cb,brt,btns=tl.type,#tl.clipboard>0,tl.brush_mode
 			btns={
 					TLButton("b_brush",1,1,112,ttp=="brush",{tip="Brush tool"}),
 					TLButton("b_rect",1,9,128,ttp=="rect",{tip="Rect tool"}),
@@ -988,14 +992,11 @@ local tl,rand_cells
 					TLButton("b_copy",1,49,136,ttp=="copy",{tip="Copy tool"}),
 					TLButton("b_cut",1,57,152,ttp=="cut",{tip="Cut tool"})
 				}
-
 			btns[9]=ui.with_active(cb,TLButton,"b_paste",1,65,168,ttp=="paste",{tip="Paste tool"})
-
 			for i,b in ipairs(btns)do
 				if b.released then tl:switch(tl_types[i])end
 			end
 			ui.spr(4,t.gx+1,t.gy+71,0)
-
 			if ttp=="brush"then
 				ui.spr(brt=="round"and 87 or 86,t.gx+1,t.gy+76,0)
 				ui.spr(brt=="square"and 103 or 102,t.gx+1,t.gy+83,0)
@@ -1036,18 +1037,14 @@ local tl,rand_cells
 		return ui.with_item(id,x,y,w,h,op,function(t,...)
 			t:check_hovered(t.gx,t.gy,w,h)
 			t:check_pressed()
-
 			if t.pressed then
 				is_on=not is_on
 				t.switched=true
 			end
 			t.is_on=is_on
-
 			t:exec()
-
 			local handle=t.hovered and(is_on and 248 or 246)
-				                    or(is_on and 232 or 230)
-
+									or(is_on and 232 or 230)
 			ui.spr(handle,t.gx,t.gy,-1,1,0,0,2,1)
 		end)
 	end
@@ -1090,11 +1087,11 @@ local tl,rand_cells
 		return val
 	end
 
-	function CellColorPicker(id,x,y,c)
+	function ColorPicker(id,x,y,name,s_idx,c)
 		local w,h,tc,r,g,b=80,24,thm.dim_text,unpk(c)
 		ui.with_item(id,x,y,w,h,_,function(t,...)
-			Label("l4",24,1,"Cell color",thm.txt,{shadow=1})
-			ui.spr(1,t.gx+88,t.gy,0)
+			Label("l4",16,1,name,thm.txt,{shadow=1})
+			ui.spr(s_idx,t.gx+88,t.gy,0)
 
 			r=ColorBar("cb1",8,8,r)
 			g=ColorBar("cb2",8,16,g)
@@ -1120,7 +1117,6 @@ local tl,rand_cells
 			or s[y][x]==1 or c[y][x]==v
 		end
 	end
-
 
 	--   Scanline FT
 	local function scnln_ft(x, y, tmp,v)
@@ -1234,10 +1230,9 @@ local tl,rand_cells
 		mode=nil,
 		mod1=false,  -- filled
 		mod2=false,  -- square
-		mod3=false,  -- centered on mouse
+		mod3=false,  -- centered on origin
 		brush_size=0,
-		-- brush_type="square",
-		brush_type="round",
+		brush_mode="round",
 		max_size=10,
 		patts={},
 		cur_patts={},
@@ -1245,7 +1240,6 @@ local tl,rand_cells
 		cur_patt=1,
 		do_update=false,
 		clipboard={},
-		-- selected=false,
 	}
 	function tl.start(t,erase)
 		t.origin=vec2(g_mx,g_my)
@@ -1317,7 +1311,7 @@ local tl,rand_cells
 	end
 
 	function tl.toggle_brush(t)
-		t.brush_type=t.brush_type=="square"and"round"or"square"
+		t.brush_mode=t.brush_mode=="square"and"round"or"square"
 		t.do_update=true
 	end
 
@@ -1345,11 +1339,11 @@ local tl,rand_cells
 			p=path[i]
 			xmin,ymin,xmax,ymax=max(1,p.x-R),max(1,p.y-R),min(GW,p.x+R),min(GH,p.y+R)
 
-			if t.brush_type=="square"then pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
-			elseif t.brush_type=="round" then pts=geom._circle_filled(p.x,p.y,xmin,ymin,xmax,ymax,R)
+			if t.brush_mode=="square"then pts=geom._rect_filled(rec4(xmin,ymin,xmax-xmin,ymax-ymin))
+			elseif t.brush_mode=="round"then pts=Bres.circle_f(p.x,p.y,R)
 			end
 
-			for i=1, #pts do
+			for i=1,#pts do
 				set[pts[i]]=1
 			end
 		end
@@ -1358,6 +1352,7 @@ local tl,rand_cells
 		for k,_ in pairs(set)do
 			pts[#pts+1]=k
 		end
+
 		tl._commit_pts(pts)
 	end
 
@@ -1382,10 +1377,16 @@ local tl,rand_cells
 		return rec2(p1,s)
 	end
 
+	function tl._chk_centr(t,r)
+		if t.mod3 then
+			r.p=t.origin-r.s//2
+			r.s=vec2(floor(r.s.x*1.5),floor(r.s.y*1.5))
+		end
+		return r
+	end
 	function tl._rect_pts(t,x,y)
 		if t.mode then
-			local r,pts=tl:_base_rect(x,y)
-			if t.mod3 then r.p=t.origin-r.s//2 end -- if centered
+			local r,pts=t:_chk_centr(tl:_base_rect(x,y))
 			if t.mod1 then pts=geom._rect_filled(r)
 			else           pts=geom._rect_hollow(r)
 			end
@@ -1395,10 +1396,9 @@ local tl,rand_cells
 
 	function tl._circle_pts(t,x,y)
 		if t.mode then
-			local r,pts,hw,hh=tl:_base_rect(x,y)
-			if t.mod3 then r.p=t.origin-r.s//2 end -- if centered
+			local r,pts,hw,hh=t:_chk_centr(tl:_base_rect(x,y))
 			hw,hh=r.w//2,r.h//2
-			pts=Bres.ellipse(r.x+hw,r.y+hh,hw,hh)
+			pts=Bres.ellipse(r.x,r.y,r.x+r.w,r.y+r.h)
 			tl._commit_pts(pts)
 			if t.mod1 then flood_fill(r.c.x,r.c.y,true)end
 		end
@@ -1500,87 +1500,96 @@ local tl,rand_cells
 		t.do_update=true
 	end
 
-	function tl._parse_patt(t,p)
-		local _add_cell,_getnum=
-			function(a,v,n)
-				for _=1,n do a[#a+1]=v end
-			end,
-			function(i,str)
-				local s,nex=str:sub(i,i)
-				while i<i+4 do -- inf loop guard
-					i=i+1
-					nex=str:sub(i,i)
-					if nex=="."or nex=="o"then break end
-					s=s..nex
-				end
-				return tonum(s),i
-			end
-
-		local lns=p:split(' ')
-		local w,h,name,pat,i,c,num,row=tonum(lns[1]),tonum(lns[2]),lns[3],{}
-		for i=1,3 do rem(lns,1)end
-		for _,l in ipairs(lns) do
-			i,row=1,{}
-			while i <= w do
-				c=l:sub(i,i)
-				if c==""then
-					_add_cell(row,0,w-#row)
-					break
-				end
-				num=tonum(c)
-				if not num then
-					_add_cell(row,c=="o" and 1 or 0,1)
-					i=i+1
-				else
-					num,i=_getnum(i,l)
-					c=l:sub(i,i)
-					_add_cell(row,c=="o" and 1 or 0,num)
-					i=i+1
-				end
-			end
-			pat[#pat+1]=row
-		end
-		return {w=w,h=h,name=name,layout=pat}
-	end
-
 	function tl.init_pats(t)
 		local pats={
 			{ -- statics
-				"3 4 '' .o o.o o.o .o",
-				"4 4 'Loaf' .2o o2.o .o.o 2.o",
+				"4 3 Beehive .2o o2.o .2o",
+				"4 4 Loaf .2o o2.o o.o .o",
+				"3 3 Boat 2o o.o .o",
+				"3 3 Ship 2o o.o .2o",
 			},
 			{ -- oscilators
-				"4 2 'Toad' .3o 3o",
-				"3 10 '' .o .o o.o .o .o .o .o o.o .o .o",
-				"4 4 '' 2o o 3.o 2.2o",
-				"13 13 'Pulsar' 2.3o3.3o . o4.o.o4.o o4.o.o4.o o4.o.o4.o 2.3o3.3o . 2.3o3.3o o4.o.o4.o o4.o.o4.o o4.o.o4.o . 2.3o3.3o",
-				"15 18 '' 8.2o2.2o 8.o4.o 9.4o 6.3o3.o.o 2.o3.o2.o3.2o .o.o3.o.o o.o2.o.o.2o o2.2o.o3.o .o.o2.o.2o 2o.o.o.o2.o o2.o.o.o.2o .2o6.o 3.5o.o 3.o4.o 4.4o . 4.2o 4.2o",
+				"4 2 Toad .3o 3o",
+				"3 10 Pentadecathlon .o .o o.o .o .o .o .o o.o .o .o",
+				"4 4 ? 2o o 3.o 2.2o",
+				"5 4 Clock 2.o 2o 2.2o .o",
+				"13 13 Pulsar 2.3o3.3o . o4.o.o4.o o4.o.o4.o o4.o.o4.o 2.3o3.3o . 2.3o3.3o o4.o.o4.o o4.o.o4.o o4.o.o4.o . 2.3o3.3o",
+				"15 18 ? 8.2o2.2o 8.o4.o 9.4o 6.3o3.o.o 2.o3.o2.o3.2o .o.o3.o.o o.o2.o.o.2o o2.2o.o3.o .o.o2.o.2o 2o.o.o.o2.o o2.o.o.o.2o .2o6.o 3.5o.o 3.o4.o 4.4o . 4.2o 4.2o",
 			},
-			{ -- explosive
-				"3 3 'R_Pentomino' .2o 2o .o",
-				"8 2 '' 2o4.o .o3.3o",
-				"29 10 '' 2o14.2o9.2o 2o15.2o8.2o 13.5o 13.4o12. . 3.2o8.4o 2.o.o.2o5.5o .2o3.2o9.2o8.2o 2.o.o.2o8.2o9.2o 3.2o",
-				"39 1 '' 8o.5o3.3o6.7o.5o",
-				"7 3 '' .o 3.o 2o2.3o",
-				"5 5 '' 3o.o o 3.2o .2o.o o.o.o",
-				"8 6 '' 6.o 4.o.2o 4.o.o 4.o 2.o o.o",
+			{ -- amusing
+				"3 3 R_Pentomino .2o 2o .o",
+				"8 2 Diehard 2o4.o .o3.3o",
+				"29 10 ? 2o14.2o9.2o 2o15.2o8.2o 13.5o 13.4o12. . 3.2o8.4o 2.o.o.2o5.5o .2o3.2o9.2o8.2o 2.o.o.2o8.2o9.2o 3.2o",
+				"39 1 ? 8o.5o3.3o6.7o.5o",
+				"7 3 Acorn .o 3.o 2o2.3o",
+				"5 5 ? 3o.o o 3.2o .2o.o o.o.o",
+				"8 6 ? 6.o 4.o.2o 4.o.o 4.o 2.o o.o",
 			},
-			{ -- gliders
-				"3 3 'Glider' 2.o o.o .2o",
-				"5 4 'Light-Weight_Spaceship' o2.o 4.o o3.o .4o",
+			{ -- Spaceships
+				"3 3 Glider 2.o o.o .2o",
+				"5 4 Lightweight_Spaceship o2.o 4.o o3.o .4o",
+				"12 17 Brain 2.2o .o2.o5.2o .3o3.3o .o2.o.4o 2.3o3.o 2.o2.3o 4.o4.2o 4.5o.o . 4.5o.o 4.o4.2o 2.o2.3o 2.3o3.o .o2.o.4o .3o3.3o .o2.o5.2o 2.2o",
+				"31 17 Blinker_Ship 12.o2.o 11.o 11.o3.o 3.2o6.4o 2.4o .2o.2o 2.2o5.2o.3o 8.o5.2o7.o4.3o 7.2o7.o6.o4.o.o 8.o5.2o7.o4.3o 2.2o5.2o.3o .2o.2o 2.4o 3.2o6.4o 11.o3.o 11.o 12.o2.o",
 			},
 			{ -- guns
-				"36 9 'Glider_Gun' 24.o11. 22.o.o 12.2o6.2o12.2o 11.o3.o4.2o12.2o 2o8.o5.o3.2o 2o8.o3.o.2o4.o.o 10.o5.o7.o 11.o3.o 12.2o",
+				"36 9 Glider_Gun 24.o11. 22.o.o 12.2o6.2o12.2o 11.o3.o4.2o12.2o 2o8.o5.o3.2o 2o8.o3.o.2o4.o.o 10.o5.o7.o 11.o3.o 12.2o",
+				"56 1 1D_Four_Gliders 56o",
+				"60 56 Glider_Puffer 40.3o 39.o2.o 42.o4.3o 42.o4.o3.o4.o 39.o.o4.o3.o3.3o 46.4o4.o.2o 47.o7.3o 55.3o 41.o13.2o 40.3o 39.2o.o 39.3o 40.2o . . . . . . 39.o 38.3o 37.2o.o11.3o 37.3o11.o2.o 37.3o14.o 38.2o14.o 51.o.o . . 38.o 39.o 34.o4.o9.o 35.5o10.o6.2o 46.o3.o4.2o.2o 47.4o4.4o 56.2o . . 20.2o33.o o2.o13.3o.2o32.2o 4.o12.5o34.2o o3.o13.3o34.2o .4o . 36.2o 21.3o10.2o.2o 23.o10.4o13.5o 21.o.o11.2o13.o4.o 21.2o32.o 54.o . 14.2o5.o2.o 13.4o8.o 2.3o8.2o.2o3.o3.o .5o9.2o5.4o .3o.2o 4.2o",
 			},
 		}
+
+		local function add(a,v,n)
+			for _=1,n do a[#a+1]=v end
+		end
+
+		local function parsenum(i,str)
+			local s,nex=str:sub(i,i)
+			while i<i+4 do -- inf loop guard
+				i=i+1
+				nex=str:sub(i,i)
+				if nex=="."or nex=="o"then break end
+				s=s..nex
+			end
+			return tonum(s),i
+		end
+
+		local function parse_patt(p)
+			local lns=p:split(' ')
+			local w,h,name,pat,i,c,num,row=tonum(lns[1]),tonum(lns[2]),lns[3],{}
+			for i=1,3 do rem(lns,1)end
+			for _,l in ipairs(lns) do
+				i,row=1,{}
+				while i <= w do
+					c=l:sub(i,i)
+					if c==""then
+						add(row,0,w-#row)
+						break
+					end
+					num=tonum(c)
+					if not num then
+						add(row,c=="o" and 1 or 0,1)
+						i=i+1
+					else
+						num,i=parsenum(i,l)
+						c=l:sub(i,i)
+						add(row,c=="o" and 1 or 0,num)
+						i=i+1
+					end
+				end
+				pat[#pat+1]=row
+			end
+			return {w=w,h=h,name=name:gsub('_',' '),layout=pat}
+		end
+
 		for j,c in ipairs(pats) do
 			t.cur_patts[j]=1
 			t.patts[j]={}
 			for i,p in ipairs(c) do
-				t.patts[j][i]=t:_parse_patt(p)
+				t.patts[j][i]=parse_patt(p)
 			end
 		end
 	end
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
 
@@ -1623,9 +1632,9 @@ local tl,rand_cells
 
 	function fill_grid(fill)
 		local cc,v,ccj=cells[cur],fill and 1 or 0
-		for j=1,GH do
+		for j=0,GH+1 do
 			ccj=cc[j]
-			for i=1,GW do
+			for i=0,GW+1 do
 				ccj[i]=v
 			end
 		end
@@ -1663,7 +1672,7 @@ local tl,rand_cells
 		tl.origin = vec0()
 		tl:init_pats()
 		-- create_cells()
-		set_zoom(pmem(ZOOM_LVL),false,true)
+		set_zoom(pmem(ZOOM_LVL),false,true) -- cells are created here
 		if opts[RAND_START] then rand_cells() end
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
@@ -1672,9 +1681,12 @@ local tl,rand_cells
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- update
 	function swap_borders(c)
-		c[GH+1],c[0]=c[1],c[GH]
 		for j=1,GH do
 			c[j][GW+1],c[j][0]=c[j][1],c[j][GW]
+		end
+		for i=0,GW+1 do
+			c[GH+1][i]=c[1][i]
+			c[0][i]=c[GH][i]
 		end
 	end
 	-- the weirdness in here seems to have given me over 10ms and 20fps
@@ -1696,7 +1708,7 @@ local tl,rand_cells
 			end
 		end
 
-		if opts[WRAP_AROUND] then  -- swap borders
+		if opts[WRAP_AROUND]then  -- swap borders
 			swap_borders(c)
 		end
 		l_cells,gens=lc,gens+1
@@ -1721,7 +1733,7 @@ local tl,rand_cells
 			end
 			tl:draw_points(g_mx,g_my)
 
-			bma("compt gen", function()
+			bma("comput gen", function()
 				if not paused and (upd_delay==0 or f%upd_delay==0) then
 					compute_gen()
 				end
@@ -1815,7 +1827,7 @@ local tl,rand_cells
 	local function draw_options()
 		ui.with_visible(true,function()
 			cls(1)
-			local tc,hc,lbt,oc,c,tx=thm.text,thm.header,{shadow=1},cell_col
+			local tc,hc,lbt,ofg,obg,fg,bg,c,tx=thm.text,thm.header,{shadow=1},cell_col,bg_col
 			printgsc("Options ",_,1,hc)
 
 			-- hacky, but avoids wasting tokens on a proper text button for a single use
@@ -1846,9 +1858,13 @@ local tl,rand_cells
 			end)
 			Label("l4",40,tx+48,"Zoom level",tc,lbt)
 
-			local c=CellColorPicker("cp",8,88,oc)
-			if c[1]~=oc[1]or c[2]~=oc[2]or c[3]~=oc[3]then
-				set_cell_color(c)
+			fg=ColorPicker("cp1",8,88,"Cell color",1,ofg)
+			if fg[1]~=ofg[1]or fg[2]~=ofg[2]or fg[3]~=ofg[3]then
+				set_cell_color(fg)
+			end
+			bg=ColorPicker("cp2",120,88,"Background",2,obg)
+			if bg[1]~=obg[1]or bg[2]~=obg[2]or bg[3]~=obg[3]then
+				set_bg_color(bg)
 			end
 		end)
 	end
@@ -1865,23 +1881,23 @@ local tl,rand_cells
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
-function inc_color()
-	local i=PALM+8*3
-	local r,g,b=
-		wrap(peek(i  )-1,0,255),
-		wrap(peek(i+1)-1,0,255),
-		wrap(peek(i+2)-1,0,255)
-	set_cell_color({r,g,b})
-end
+-- function inc_color()
+-- 	local i=PALM+8*3
+-- 	local r,g,b=
+-- 		wrap(peek(i  )-1,0,255),
+-- 		wrap(peek(i+1)-1,0,255),
+-- 		wrap(peek(i+2)-1,0,255)
+-- 	set_cell_color({r,g,b})
+-- end
 
-function dec_color()
-	local i=PALM+8*3
-		local r,g,b=
-		wrap(peek(i  )+1,0,255),
-		wrap(peek(i+1)+1,0,255),
-		wrap(peek(i+2)+1,0,255)
-	set_cell_color({r,g,b})
-end
+-- function dec_color()
+-- 	local i=PALM+8*3
+-- 		local r,g,b=
+-- 		wrap(peek(i  )+1,0,255),
+-- 		wrap(peek(i+1)+1,0,255),
+-- 		wrap(peek(i+2)+1,0,255)
+-- 	set_cell_color({r,g,b})
+-- end
 
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
@@ -2049,15 +2065,11 @@ end
 		stopped=true
 	end
 
-	function set_speed(dir)
-
-	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
 
 function TIC()
-bma("whole",function()--@bm
-
+bma("Total",function()--@bm
 	tm_check()
 	update_mst()
 
@@ -2069,14 +2081,10 @@ bma("whole",function()--@bm
 	input()
 	update()
 	render()
-	monitor("mouse_ui", ui.mouse_on_ui,11)
+
 	ui.end_frame()
 
-	-- local i=PALM+8*3
-	-- local r,g,b=peek(i),peek(i+1),peek(i+2)
-	-- monitor("col", "("..r..","..g..","..b..")",8)
-
-		dbg:draw()
+	dbg:draw()
 end)--@bm
 end
 
