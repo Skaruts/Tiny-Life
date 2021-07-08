@@ -1080,7 +1080,7 @@ end
 				}
 			btns[9]=ui.with_active(cb,TLButton,"b_paste",1,65,168,ttp=="paste",{tip="Paste tool"})
 			for i,b in ipairs(btns)do
-				if b.released then tl:switch(tl_types[i])end
+				if b.pressed then tl:switch(tl_types[i])end
 			end
 			ui.spr(4,t.gx+1,t.gy+71,0)
 			if ttp=="brush"then
