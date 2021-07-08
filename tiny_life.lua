@@ -661,11 +661,10 @@
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
 	-- in-game persistent options / load values or defaults
-	local webv,opts=false,{true,true,true,false,1,[9]=true}
+	local webv,opts,PALM=false,{true,true,true,false,2,[9]=true},0x03FC0
 	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,FG_R,FG_G,FG_B,USE_TLTIPS,BG_R,BG_G,BG_B=1,2,3,4,5,6,7,8,9,10,11,12
 
 	-- original cell color = da7100 | 218,113,0
-	local PALM=0x03FC0
 	local cell_col=webv and {peek(PALM+8*3),peek(PALM+8*3+1),peek(PALM+8*3+2)} or nil
 	local bg_col=webv and {peek(PALM+15*3),peek(PALM+15*3+1),peek(PALM+15*3+2)} or nil
 
@@ -1690,7 +1689,7 @@ end
 			create_cells()
 			TOT_CELLS = GW*GH
 			if not paused then pause() end
-			pmem(ZOOM_LVL, val)
+			if not webv then pmem(ZOOM_LVL,val)end
 		end
 	end
 
@@ -1699,7 +1698,7 @@ end
 		tl.origin = vec0()
 		tl:init_pats()
 		-- create_cells()
-		set_zoom(pmem(ZOOM_LVL),false,true) -- cells are created here
+		set_zoom(opts[ZOOM_LVL],false,true) -- cells are created here
 		if opts[RAND_START] then rand_cells() end
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
