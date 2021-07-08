@@ -908,12 +908,14 @@ local tl,rand_cells
 
 	function GenInfo()
 		if ui.visible then
-			local ty,tc,oc,fw,sf,cstr,tcstr,tstr=2,thm.text,thm.outl,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
+			local ty,tc,oc,fw,sf,cstr,tcstr,tstr,txt,tw=2,thm.text,thm.outl,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
 			printo("Gen: "..gens,2,ty,tc,oc,fw,_,sf)
 
 			ty=ty+8*15-1
 			if tl.type=="patt"then
-				printo(fmt("%s: %s",cats[tl.cur_cat],tl.patts[tl.cur_cat][tl.cur_patt].name),2,ty,thm.dim_text,oc,fw,_,sf)
+				txt=fmt("%s: %s",cats[tl.cur_cat],tl.patts[tl.cur_cat][tl.cur_patt].name)
+				tw=txtw(txt,fw,_,sf)
+				printo(txt,120-tw//2,ty-2,thm.dim_text,oc,fw,_,sf)
 			end
 			ty=ty+8
 			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,fw,_,sf)
@@ -2084,7 +2086,7 @@ bma("Total",function()--@bm
 	render()
 
 	ui.end_frame()
-
+	-- draw_dbg_center_lines(14)
 	dbg:draw()
 end)--@bm
 end
