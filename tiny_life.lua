@@ -1,6 +1,6 @@
 
 -- title: Tiny Life
--- author: MetalDudeBro
+-- author: Skaruts (MetalDudeBro)
 -- desc: A toy Game of Life
 -- script: lua
 -- input: mouse, keyboard
