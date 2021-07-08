@@ -652,6 +652,12 @@
 				function(...)ui.push_render_step("prints",{...})end,
 				prints
 			)
+		--[[ print with outline                    001 ]]
+			ui.add_render_step("printo",
+				function(...)ui.push_render_step("printo",{...})end,
+				printo
+			)
+
 		--[[ nframe rendering                       002 ]]
 			local function _draw_quad(x,y,w,h,u,v,u2,v2)
 				textri(x, y,   x+w,  y,    x+w, y+h,   u, v,   u2, v,    u2, v2)
@@ -1243,6 +1249,7 @@ local tl,rand_cells
 		cur_patt=1,
 		do_update=false,
 		clipboard={},
+		info=nil,
 	}
 	function tl.start(t,erase)
 		t.origin=vec2(g_mx,g_my)
@@ -1292,6 +1299,7 @@ local tl,rand_cells
 			if opts[WRAP_AROUND]then swap_borders(c)end
 			if cancel then t:stop()end
 			t.do_update=true
+			t.info=nil
 		end
 	end
 
@@ -1387,23 +1395,37 @@ local tl,rand_cells
 		end
 		return r
 	end
+
+	function tl.show_info(t)
+		local w,h,x,y=txtw(t.info,true,1,true),8,mx+2,my-6
+
+		if x+w>240 then x=min(mx-w,240-w) end
+		if y+h>136 then y=136-h end
+		if x<0 then x=0 end
+		if y<0 then y=0 end
+
+		ui.printo(t.info,x,y,thm.dim_text,thm.outl,true,1,true)
+	end
+
 	function tl._rect_pts(t,x,y)
 		if t.mode then
-			local r,pts=t:_chk_centr(tl:_base_rect(x,y))
+			local r,pts=t:_chk_centr(t:_base_rect(x,y))
 			if t.mod1 then pts=geom._rect_filled(r)
 			else           pts=geom._rect_hollow(r)
 			end
-			tl._commit_pts(pts)
+			t._commit_pts(pts)
+			t.info = (r.w+1)..","..(r.h+1)
 		end
 	end
 
 	function tl._circle_pts(t,x,y)
 		if t.mode then
-			local r,pts,hw,hh=t:_chk_centr(tl:_base_rect(x,y))
+			local r,pts,hw,hh=t:_chk_centr(t:_base_rect(x,y))
 			hw,hh=r.w//2,r.h//2
 			pts=Bres.ellipse(r.x,r.y,r.x+r.w,r.y+r.h)
-			tl._commit_pts(pts)
+			t._commit_pts(pts)
 			if t.mod1 then flood_fill(r.c.x,r.c.y,true)end
+			t.info = (r.w+1)..","..(r.h+1)
 		end
 	end
 
@@ -1415,7 +1437,10 @@ local tl,rand_cells
 
 	function tl._line_pts(t,x,y)
 		if t.mode then
-			tl._commit_pts(Bres.line(t.origin.x,t.origin.y,x,y))
+			local ox,oy,w,h=t.origin.x,t.origin.y
+			w,h=ox-x,oy-y
+			tl._commit_pts(Bres.line(ox,oy,x,y))
+			t.info = ""..floor(sqrt(sdist(ox,oy,x,y)))+1
 		end
 	end
 
@@ -1751,6 +1776,7 @@ local tl,rand_cells
 				end
 			end
 			tl:draw_points(g_mx,g_my)
+			if tl.info then tl:show_info()end
 
 			bma("comput gen", function()
 				if not paused and (upd_delay==0 or f%upd_delay==0) then
