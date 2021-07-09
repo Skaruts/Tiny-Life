@@ -11,18 +11,18 @@ The code is a bit cryptic because I kept hitting on the 64k token limit, and als
 ## Changelog (didn't keep track of it until 1.3)
 
 ### version 1.3
- - improved performance (with border swapping), to a mostly stable 60 fps
+ - improved performance (with border swapping), to a mostly stable 60 fps in 0.70, and about 45-50 in 0.80
  - overhauled/streamlined the UI (this gave me a lot more token budget)
- - fixed brush drawing gaps (you can now draw continuous strokes)
  - added a rounded mode to brush tool
+ - fixed brush drawing gaps (you can now draw continuous strokes)
  - added copy/cut/paste from/to the board
  - patterns and clipboard can now be rotated (Q/E) and flipped (A/Z)
  - rect/circle sizes are shown while drawing
- - the current state of the board can be saved and loaded. Reseting (pressing stop button) loads the saved state.
- - backgrond and cell colors can be changed in options (and are persistent in the non-web version)
- - added speed controls
- - improved the drawing tools (draw with left mouse button, erase with right mouse button)
+ - the current state of the board can be saved and loaded. Reseting (pressing stop button) also loads the saved state.
+ - backgrond and cell colors can be changed in the options (and are persistent in the non-web version)
+ - added speed controls (Up/Down arrows, or Shift+Up/Down arrows)
+ - improved the drawing tools (all tools now draw with LMB and erase with RMB)
 
  - fixed annoying gaps that plagued flat ellipses
- - fixxed problems that plagued rect/circle proportional/centered modes
- - removed dead cells functionalities, as they were mostly useless/redundant and
+ - fixed problems that plagued rect/circle proportional/centered modes
+ - removed dead cells stuff, as they were mostly useless and redundant
