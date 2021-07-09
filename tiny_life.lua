@@ -662,7 +662,7 @@
 -- setup
 	-- in-game persistent options / load values or defaults
 	local webv=false
-	local opts,PALM={true,true,true,false,(webv and 2 or 1),[9]=true},0x03FC0
+	local opts,PALM={true,true,false,false,1,[9]=true},0x03FC0
 	local USE_PADDING,WRAP_AROUND,RAND_START,RAND_RESET,ZOOM_LVL,FG_R,FG_G,FG_B,USE_TLTIPS,BG_R,BG_G,BG_B=1,2,3,4,5,6,7,8,9,10,11,12
 
 	-- original cell color = da7100 | 218,113,0
@@ -693,10 +693,11 @@
 	if not webv then
 		if pmem(USE_PADDING) ~= 1 then opts[USE_PADDING] = false end
 		if pmem(WRAP_AROUND) ~= 1 then opts[WRAP_AROUND] = false end
-		if pmem(RAND_START)  ~= 1 then opts[RAND_START]  = false end
+		if pmem(RAND_START)  ~= 0 then opts[RAND_START]  = true end
 		if pmem(RAND_RESET)  ~= 0 then opts[RAND_RESET]  = true end
 		if pmem(USE_TLTIPS)  ~= 1 then opts[USE_TLTIPS]  = false end --tooltip
-		if pmem(ZOOM_LVL)==0 then pmem(ZOOM_LVL, opts[ZOOM_LVL]) end
+		-- if pmem(ZOOM_LVL)==0 then pmem(ZOOM_LVL, opts[ZOOM_LVL]) end
+		if pmem(ZOOM_LVL)~=0 then opts[ZOOM_LVL]=pmem(ZOOM_LVL)end
 
 		local mr,mg,mb=pmem(FG_R),pmem(FG_G),pmem(FG_B)
 		set_cell_color({mr,mg,mb})
@@ -719,7 +720,7 @@
 	local pre,cur,dum,sav=1,2,3,4 -- prev/curr/dummy,saved buffer indices
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
-	local zoom_mults={8,4,2,1}
+
 	local pad=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
 	local paused,stopped=true,true
 	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
@@ -1637,7 +1638,7 @@ end
 			end
 		end
 		cells={b1,b2,b3,b4}
-		TOT_CELLS=GW*GH
+		l_cells,TOT_CELLS=0,GW*GH
 	end
 
 	function save_board()
@@ -1668,38 +1669,31 @@ end
 		l_cells=(fill and GW*GH or 0)
 	end
 
-
-
 	function dec_zoom()set_zoom(opts[ZOOM_LVL]-1,true)end
 	function inc_zoom()set_zoom(opts[ZOOM_LVL]+1,true)end
 
-	function set_zoom(val, wrp, force)
-		local limit = wrp and wrap or clamp
-		val = limit(val, 1, 4)
+	local _zoom_mults={8,4,2,1}
+	function set_zoom(val,wrp,force)
+		local limit,n=wrp and wrap or clamp
+		val=limit(val,1,4)
+		n=_zoom_mults[val]
 
-		local n=zoom_mults[val]
-
-		if val ~= opts[ZOOM_LVL] or force then
-			CS = 8//n
-			GW = 30*n
-			GH = 17*n
-			opts[ZOOM_LVL] = val
+		if val~=opts[ZOOM_LVL]or force then
+			CS,GW,GH=8//n,30*n,17*n
+			opts[ZOOM_LVL]=val
 			set_padding(opts[USE_PADDING])
-			gens = 0
-			l_cells = 0
+			gens=0
 			create_cells()
-			TOT_CELLS = GW*GH
-			if not paused then pause() end
+			if not paused then pause()end
 			if not webv then pmem(ZOOM_LVL,val)end
 		end
 	end
 
 	function init()
-		set_padding(opts[USE_PADDING])
 		tl.origin = vec0()
 		tl:init_pats()
 		-- create_cells()
-		set_zoom(pmem(ZOOM_LVL),false,true) -- cells are created here
+		set_zoom(opts[ZOOM_LVL],false,true) -- cells are created here
 		if opts[RAND_START] then rand_cells() end
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
