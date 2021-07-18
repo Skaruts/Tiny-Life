@@ -735,7 +735,10 @@
 
 	local ALIVE,COUNT,NB=1<<4,0xf,1
 	local NEW_CELL=ALIVE
-
+	local upf,speed,buildup=1,0,0
+	local speeds={[-5]=1/32,[-4]=1/16,[-3]=1/8,[-2]=1/4,[-1]=1/2,[0]=1,2,4,8,16,32}
+	local speed_names={"/32","/16","/8","/4","/2","x1","x2","x4","x8","x16","x32"}
+	local MAX_SPEED=5
 	local cats={
 		"Statics",
 		"Oscilators",
@@ -978,24 +981,33 @@ end
 
 	function GenInfo()
 		if ui.visible then
-			local ty,tc,oc,fw,sf,cstr,tcstr,tstr,txt,tw=2,thm.text,thm.outl,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
-			printo("Gen: "..gens,2,ty,tc,oc,fw,_,sf)
+			local ty,tc,oc,dtc,fw,sf,cstr,tcstr,tstr,txt,tw=2,thm.text,thm.outl,thm.dim_text,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
+			txt,tx="Gen:",2
+			printo("Gen:",tx,ty,tc,oc,fw,_,sf)
+			printo(gens,tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
 
 			ty=ty+8*15-1
 			if tl.type=="patt"then
 				txt=fmt("%s: %s",cats[tl.cur_cat],tl.patts[tl.cur_cat][tl.cur_patt].name)
 				tw=txtw(txt,fw,_,sf)
-				printo(txt,120-tw//2,ty-2,thm.dim_text,oc,fw,_,sf)
+				printo(txt,120-tw//2,ty-2,dtc,oc,fw,_,sf)
 			end
 			ty=ty+8
-			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,fw,_,sf)
-			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),45,ty,tc,oc,fw,_,sf)
-			printo("Speed:"..1-(1*(upd_delay/100)),83,ty,tc,oc,fw,_,sf)
+			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,dtc,oc,fw,_,sf)
 
-			printo("Cells:"..rep(' ',6-#cstr)..cstr
-				 .."|"..rep(' ',6-#tcstr)..tcstr
-				 .."/"..rep(' ',6-#tstr)..tstr
-				,135,ty,tc,oc,fw,_,sf)
+			txt,tx="Zoom:",45
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(opts[ZOOM_LVL],tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
+
+			txt,tx="Speed:",83
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(speed_names[speed+MAX_SPEED+1],tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
+
+			txt,tx="Cells:      |      /      ",136
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(rep(' ',6-#cstr)..cstr,tx+8*3,ty,dtc,oc,fw,_,sf)
+			printo(rep(' ',6-#tcstr)..tcstr,tx+17*3,ty,dtc,oc,fw,_,sf)
+			printo(rep(' ',6-#tstr)..tstr,tx+26*3+1,ty,dtc,oc,fw,_,sf)
 		end
 	end
 
@@ -1013,7 +1025,7 @@ end
 			b1=Button("b_rand",2,1,16, {tip="Randomize cells[cel]"}   )
 			b2=Button("b_zoom",10,1,19, {tip="Zoom in"}   )
 			Separator(15,1)
-			b3=ui.with_active(upd_delay<100,Button,"b_back",22,1,32,{tip="Slower speed"})
+			b3=ui.with_active(speed>-MAX_SPEED,Button,"b_back",22,1,32,{tip="Slower speed"})
 			b4=Button("b_stop",30,1,stopped and 67 or 64,{tip="Stop and reset board"})
 
 			if stopped then
@@ -1027,7 +1039,7 @@ end
 				if b6.released then pause()end
 			end
 
-			b7=ui.with_active(upd_delay>0,Button,"b_fwd",46,1,48,{tip="Faster speed"})
+			b7=ui.with_active(speed<MAX_SPEED,Button,"b_fwd",46,1,48,{tip="Faster speed"})
 
 			Separator(52,1)
 			b8=Button("b_opts",59,1,240,{tip="Show options"})
@@ -1838,16 +1850,24 @@ end
 
 
 	local function update_ui()
-	bma("ui update",function()--@bm
+	bma("ui update",function()--start_bm
 		if state=="game"and tb_vis then
 			PlaybackBar("pb", pb_rect)
 			Toolbar("tb",tb_rect)
 		end
-	end)--@bm
+	end)--end_bm
+	end
+
+	local function update_gen_slow()
+	end
+	local function update_gen_normal()
+	end
+	local function update_gen_fast()
+
 	end
 
 	local function update()
-	bma("update",function()--@bm
+	bma("update",function()--start_bm
 		if state=="game"then
 			if mmoved() then
 				if tl.type~="copy"or tl.mode then
@@ -1857,13 +1877,27 @@ end
 			tl:draw_points(g_mx,g_my)
 			if tl.info then tl:show_info()end
 
-			bma("comput gen", function()
-				if not paused and (upd_delay==0 or f%upd_delay==0) then
-					compute_gen()
-				end
-			end) --@bm
+			-- bma("comput gen",function()--start_bm
+			-- 	if not paused and (upd_delay==0 or f%upd_delay==0) then
+			-- 		compute_gen()
+			-- 	end
+			-- end) --end_bm
+			if not paused then
+				buildup=speed>=0 and floor(buildup+speeds[speed]) or buildup+speeds[speed]
+				offset=speed>0 and f%2 or 0 -- this avoids oscilators looking static when sped up (f is from tm_check)
+				monitor("buildup",buildup,11)
+
+				bma("gen",function()
+					if buildup >= max(1, upf) then
+						for i=1,floor(buildup)+offset do
+							compute_gen()
+						end
+						buildup=0
+					end
+				end) --end_bm
+			end
 		end
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1906,14 +1940,14 @@ end
 	end
 
 	local function render_ui()
-	bma("ui_render",function()--@bm
+	bma("ui_render",function()--start_bm
 		if info_vis then
 			GenInfo()
 		end
 		if opts[USE_TLTIPS] and tb_vis then
 			ToolTip()
 		end
-	end)--@bm
+	end)--end_bm
 	end
 
 	local function draw_game()
@@ -1994,14 +2028,14 @@ end
 	end
 
 	local function render()
-	bma("render",function()--@bm
+	bma("render",function()--start_bm
 		cls(thm.bg)
 		-- cls(2)
 		if     state=="game"then draw_game()
 		elseif state~="options"then draw_help()
 		else draw_options()
 		end
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -2114,12 +2148,12 @@ end
 	end
 
 	local function input()
-	bma("input",function()--@bm
+	bma("input",function()--start_bm
 		if not ui.mouse_on_ui then
 			handle_mouse()
 		end
 		handle_keys()
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -2128,11 +2162,15 @@ end
 -- Unsorted stuff
 
 	function inc_speed()
-		upd_delay=clamp(upd_delay-1,0,100)
+		-- upd_delay=clamp(upd_delay-1,0,100)
+		speed=min(speed+1,MAX_SPEED)
+		upf=speeds[speed]
 	end
 
 	function dec_speed()
-		upd_delay=clamp(upd_delay+1,0,100)
+		-- upd_delay=clamp(upd_delay+1,0,100)
+		speed=max(speed-1,-MAX_SPEED)
+		upf=speeds[speed]
 	end
 
 	function toggle_ui()
@@ -2183,7 +2221,7 @@ end
 
 
 function TIC()
-bma("Total",function()--@bm
+bma("Total",function()--start_bm
 	tm_check()
 	update_mst()
 
@@ -2198,7 +2236,7 @@ bma("Total",function()--@bm
 
 	ui.end_frame()
 	dbg:draw()
-end)--@bm
+end)--end_bm
 end
 
 
