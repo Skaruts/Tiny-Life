@@ -101,7 +101,7 @@
 	--[[ Vector2 (stripped)             (0.02) ]]
 		local _VECMT,vecv,vec0,vec2={}
 		_VECMT={
-			__index=_VECMT,
+			__index=function(t,k) return _VECMT[k] end,
 			__tostring=function(t)return fmt("(%s,%s)",t.x,t.y)end,
 			__add=function(a,b)return type(b)=="number"and vec2(a.x+b,a.y+b)or vec2(a.x+b.x,a.y+b.y)end,
 			__sub=function(a,b)return type(b)=="number"and vec2(a.x-b,a.y-b)or vec2(a.x-b.x,a.y-b.y)end,
@@ -109,7 +109,6 @@
 			__div=function(a,b)return type(b)=="number"and vec2(a.x/b,a.y/b)or vec2(a.x/b.x,a.y/b.y)end,
 			__idiv=function(a,b)return type(b)=="number"and vec2(a.x//b,a.y//b)or vec2(a.x//b.x,a.y//b.y)end,
 			__eq=function(a,b)return a.x==b.x and a.y==b.y end,
-			abs=function(v)return vec2(abs(v.x),abs(v.y))end,
 		}
 		function vecv(v)return setmt({x=v.x or v[1],y=v.y or v[2]},_VECMT)end
 		function vec0()return setmt({x=0,y=0},_VECMT)end
@@ -149,14 +148,7 @@
 			end,
 			__tostring=function(t)return fmt("(%s,%s,%s,%s)",t.x,t.y,t.w,t.h)end,
 			__eq=function(t,o)return t.x==o.x and t.y==o.y and t.w==o.w and t.h==o.h end,
-
-			sq=function(t)
-				return rec4(
-					t.x, t.y,
-					t.w > t.h and t.h or t.w,
-					t.w > t.h and t.h or t.w
-				)
-			end,
+			unpk=function(t)return t.x,t.y,t.w,t.h end,
 		}
 	--[[ Bresenham Stuff                       005 ]]
 		local Bres={}
@@ -1462,8 +1454,8 @@ end
 
 	function tl._chk_centr(t,r)
 		if t.mod3 then
-			r.p=t.origin-r.s//2
-			r.s=vec2(floor(r.s.x*1.5),floor(r.s.y*1.5))
+			r.p=t.origin-r.s
+			r.s=r.s*2
 		end
 		return r
 	end
@@ -1488,12 +1480,12 @@ end
 
 	function tl._circle_pts(t,x,y)
 		if t.mode then
-			local r,pts,hw,hh=t:_chk_centr(t:_base_rect(x,y))
-			hw,hh=r.w//2,r.h//2
-			pts=Bres.ellipse(r.x,r.y,r.x+r.w,r.y+r.h)
+			local r,pts,w,h=t:_chk_centr(t:_base_rect(x,y))
+			x,y,w,h=r:unpk()
+			pts=Bres.ellipse(x,y,x+w,y+h)
 			t._commit_pts(pts)
 			if t.mod1 then flood_fill(r.c.x,r.c.y,true)end
-			t.info = (r.w+1)..","..(r.h+1)
+			t.info = (w+1)..","..(h+1)
 		end
 	end
 
