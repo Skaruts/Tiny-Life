@@ -660,6 +660,11 @@
 			)
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
+
+	-- fwd decls
+	local tl,rand_cells,set_wrap
+
+
 	-- in-game persistent options / load values or defaults
 	local webv=false
 	local opts,PALM={true,true,false,false,1,[9]=true},0x03FC0
@@ -706,26 +711,34 @@
 		set_bg_color({mr,mg,mb})
 	end
 
-	function toggle_opt(i) -- toggle value of an option and save it
+	function toggle_opt(i) -- toggle value of an option and cells[sav] it
 		local b=not opts[i]
 		opts[i]=b
 		if not webv then pmem(i,b and 1 or 0)end
-		if i==USE_PADDING then set_padding(b)end
+		if i==USE_PADDING then set_padding(b)
+		elseif i==WRAP_AROUND then set_wrap()
+		end
 	end
 
 	local upd_delay=0
 	local g_mx,g_my,g_lmx,g_lmy=0,0,0,0 -- grid mouse pos
 	local ctrl,shift,alt=false,false,false
 
-	local pre,cur,dum,sav=1,2,3,4 -- prev/curr/dummy,saved buffer indices
+	local cel,dum,sav=1,2,3 -- real cells / dummy cells / saved cell indices
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 
 	local pad=0 -- padding for cell rects (always 0 if 'opts[ZOOM_LVL] < 8' -- see 'set_padding()')
-	local paused,stopped=true,true
-	local l_cells,gens,TOT_CELLS=0,0,0 -- living cells / generations
+	local paused,stopped,do_wrap=true,true
+	local l_cells,gens,TOT_CELLS,NB,NEW_CELL=0,0,0,2,1 -- living cells[cel] / generations
 	local NUM_HELP_SCRS,state=4,"game"
 
+	local ALIVE,COUNT,NB=1<<4,0xf,1
+	local NEW_CELL=ALIVE
+	local upf,speed,buildup=1,0,0
+	local speeds={[-5]=1/32,[-4]=1/16,[-3]=1/8,[-2]=1/4,[-1]=1/2,[0]=1,2,4,8,16,32}
+	local speed_names={"/32","/16","/8","/4","/2","x1","x2","x4","x8","x16","x32"}
+	local MAX_SPEED=5
 	local cats={
 		"Statics",
 		"Oscilators",
@@ -802,14 +815,95 @@
 	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
--- fwd decls
-local tl,rand_cells
+
 
 local function inbounds(x,y)
 	return x>0 and x<=GW and y>0 and y<=GH
 end
+	local pcells={}  -- reuse array to not trigger GC
+	local function copy_board(c)
+		local t,tj,cj=pcells
+		for j=1,GH do
+			tj,cj=t[j],c[j]
+			for i=1,GW do
+				tj[i]=cj[i]
+			end
+		end
+		return t
+	end
 
+	local function upd_neighbs_wrap(x,y,n)
+		local l,r,u,d=x-1,x+1,y-1,y+1
+		if     l < 1  then l = GW
+		elseif r > GW then r = 1 end
+		if     u < 1  then u = GH
+		elseif d > GH then d = 1 end
+		local c=cells[cel]
+		local cy,cu,cd=c[y],c[u],c[d]
 
+		cu[l] = cu[l] + n
+		cu[x] = cu[x] + n
+		cu[r] = cu[r] + n
+		cy[l] = cy[l] + n
+		cy[r] = cy[r] + n
+		cd[l] = cd[l] + n
+		cd[x] = cd[x] + n
+		cd[r] = cd[r] + n
+	end
+
+	local function upd_neighbs_nowrap(x,y,n)
+		local l,r,u,d=x-1,x+1,y-1,y+1
+		local c=cells[cel]
+		local cy,cu,cd=c[y],c[u],c[d]
+
+		if u>=1 then
+			if l >= 1 then cu[l] = cu[l] + n end
+			cu[x] = cu[x] + n
+			if r <= GW then cu[r] = cu[r] + n end
+		end
+
+		if l >= 1 then  cy[l] = cy[l] + n end
+		if r <= GW then cy[r] = cy[r] + n end
+
+		if d<=GH then
+			if l >= 1 then cd[l] = cd[l] + n end
+			cd[x] = cd[x] + n
+			if r <= GW then cd[r] = cd[r] + n end
+		end
+	end
+
+	local update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
+
+	function set_wrap(b)
+		update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
+	end
+
+	local function update_all_neighbors()
+		local c=cells[cel]
+		for j=1,GH do
+			for i=1,GW do
+				if c[j][i]>=ALIVE then
+					update_neighbors(i,j,NB)
+				end
+			end
+		end
+	end
+
+	local function revive(x,y)
+		local cy= cells[cel][y]
+		if cy[x]>=ALIVE then return end
+		cy[x]=cy[x]|ALIVE
+		update_neighbors(x,y,NB)
+		l_cells=l_cells+1
+	end
+
+	local function kill(x,y)
+		local cy= cells[cel][y]
+		if cy[x]<ALIVE then return end
+		cy[x]=cy[x]&~ALIVE
+		update_neighbors(x,y,-NB)
+		l_cells=l_cells-1
+	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
 	local pb_rect={x=240//2-76//2,  y=-2,             w=76,  h=10}
@@ -887,24 +981,33 @@ end
 
 	function GenInfo()
 		if ui.visible then
-			local ty,tc,oc,fw,sf,cstr,tcstr,tstr,txt,tw=2,thm.text,thm.outl,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
-			printo("Gen: "..gens,2,ty,tc,oc,fw,_,sf)
+			local ty,tc,oc,dtc,fw,sf,cstr,tcstr,tstr,txt,tw=2,thm.text,thm.outl,thm.dim_text,true,true,tostr(l_cells),tostr(TOT_CELLS-l_cells),tostr(TOT_CELLS)
+			txt,tx="Gen:",2
+			printo("Gen:",tx,ty,tc,oc,fw,_,sf)
+			printo(gens,tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
 
 			ty=ty+8*15-1
 			if tl.type=="patt"then
 				txt=fmt("%s: %s",cats[tl.cur_cat],tl.patts[tl.cur_cat][tl.cur_patt].name)
 				tw=txtw(txt,fw,_,sf)
-				printo(txt,120-tw//2,ty-2,thm.dim_text,oc,fw,_,sf)
+				printo(txt,120-tw//2,ty-2,dtc,oc,fw,_,sf)
 			end
 			ty=ty+8
-			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,thm.dim_text,oc,fw,_,sf)
-			printo(fmt("Zoom:%s",opts[ZOOM_LVL]),45,ty,tc,oc,fw,_,sf)
-			printo("Speed:"..1-(1*(upd_delay/100)),83,ty,tc,oc,fw,_,sf)
+			printo(fmt("%s, %s",g_mx-1,g_my-1),2,ty,dtc,oc,fw,_,sf)
 
-			printo("Cells:"..rep(' ',6-#cstr)..cstr
-				 .."|"..rep(' ',6-#tcstr)..tcstr
-				 .."/"..rep(' ',6-#tstr)..tstr
-				,135,ty,tc,oc,fw,_,sf)
+			txt,tx="Zoom:",45
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(opts[ZOOM_LVL],tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
+
+			txt,tx="Speed:",83
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(speed_names[speed+MAX_SPEED+1],tx+txtw(txt,fw,_,sf),ty,dtc,oc,fw,_,sf)
+
+			txt,tx="Cells:      |      /      ",136
+			printo(txt,tx,ty,tc,oc,fw,_,sf)
+			printo(rep(' ',6-#cstr)..cstr,tx+8*3,ty,dtc,oc,fw,_,sf)
+			printo(rep(' ',6-#tcstr)..tcstr,tx+17*3,ty,dtc,oc,fw,_,sf)
+			printo(rep(' ',6-#tstr)..tstr,tx+26*3+1,ty,dtc,oc,fw,_,sf)
 		end
 	end
 
@@ -919,10 +1022,10 @@ end
 			ui.tiled1(10,r.x,r.y,r.w,r.h,0)
 			local b1,b2,b3,b4,b5,b6,b7,b8,b9
 
-			b1=Button("b_rand",2,1,16, {tip="Randomize cells"}   )
+			b1=Button("b_rand",2,1,16, {tip="Randomize cells[cel]"}   )
 			b2=Button("b_zoom",10,1,19, {tip="Zoom in"}   )
 			Separator(15,1)
-			b3=ui.with_active(upd_delay<100,Button,"b_back",22,1,32,{tip="Slower speed"})
+			b3=ui.with_active(speed>-MAX_SPEED,Button,"b_back",22,1,32,{tip="Slower speed"})
 			b4=Button("b_stop",30,1,stopped and 67 or 64,{tip="Stop and reset board"})
 
 			if stopped then
@@ -936,7 +1039,7 @@ end
 				if b6.released then pause()end
 			end
 
-			b7=ui.with_active(upd_delay>0,Button,"b_fwd",46,1,48,{tip="Faster speed"})
+			b7=ui.with_active(speed<MAX_SPEED,Button,"b_fwd",46,1,48,{tip="Faster speed"})
 
 			Separator(52,1)
 			b8=Button("b_opts",59,1,240,{tip="Show options"})
@@ -1092,7 +1195,7 @@ end
 			or s[y][x]==1
 		else
 			return x<1 or y<1 or x>GW or y>GH
-			or s[y][x]==1 or c[y][x]==v
+			or s[y][x]==1 or c[y][x]&ALIVE==v
 		end
 	end
 
@@ -1110,7 +1213,7 @@ end
 
 		_p(x,y) -- add initial point
 
-		local s,c,pt,set_abv,set_blw,sy=cells[dum],cells[cur]
+		local s,c,pt,set_abv,set_blw,sy=cells[dum],cells[cel]
 		repeat
 			pt = _p()
 			set_abv,set_blw,sy,x=true,true,s[pt.y],pt.x
@@ -1145,11 +1248,9 @@ end
 	end
 
 	local function flood_fill(x,y,tmp)
-		scnln_ft(x,y,tmp or false,tl.mode=="draw"and 1 or 0)
+		scnln_ft(x,y,tmp or false, tl.mode=="draw"and ALIVE or 0)
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
-
-
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Geometry stuff
@@ -1194,7 +1295,6 @@ end
 	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
-
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- Tools
 	tl = {
@@ -1228,20 +1328,22 @@ end
 	end
 
 	function tl.copy(t)
-		local cb,c,r,cj,cbj={},cells[cur],tl:_base_rect(g_mx,g_my)
+		local cb,c,r,cj,cbj,x,y={},cells[cel],tl:_base_rect(g_mx,g_my)
 		for j=0,r.h-1 do
 			cbj,cj={},c[j+r.y]
 			for i=0,r.w-1 do
-				cbj[i]=cj[i+r.x]
+				cbj[i]=cj[i+r.x]>=ALIVE and 1 or 0
 			end
 			cb[j]=cbj
 		end
 		t.clipboard=cb
 		if tl.type=="cut" then
 			for j=0,r.h-1 do
-				cj=c[j+r.y]
+				y=j+r.y
+				cj=c[y]
 				for i=0,r.w-1 do
-					cj[i+r.x]=0
+					x=i+r.x
+					kill(x,y)
 				end
 			end
 		end
@@ -1252,16 +1354,27 @@ end
 	function tl.commit(t,cancel)
 		if not t.mode then return end
 		if tl.type~="copy"and tl.type~="cut"then
-			local s,c,v,sj,cj=cells[dum],cells[cur],t.mode=="draw"and 1 or 0
-			for j=1,GH do
-				sj,cj=s[j],c[j]
-				for i=1,GW do
-					if sj[i]==1then
-						cj[i]=v
+			local s,c,v,ov,sj,cj=
+				cells[dum],
+				cells[cel],
+				t.mode=="draw"and NEW_CELL or 0
+
+			if tl.mode=="draw" then
+				for j=1,GH do
+					sj,cj=s[j],c[j]
+					for i=1,GW do
+						if sj[i]==1 then revive(i,j) end
+					end
+				end
+			else
+				for j=1,GH do
+					sj,cj=s[j],c[j]
+					for i=1,GW do
+						if sj[i]==1 then kill(i,j) end
 					end
 				end
 			end
-			if opts[WRAP_AROUND]then swap_borders(c)end
+
 			if cancel then t:stop()end
 			t.do_update=true
 			t.info=nil
@@ -1406,7 +1519,7 @@ end
 	end
 
 	function tl._fill_pts(t,x,y)
-		t.mode=cells[cur][y][x]>0 and"erase"or"draw"
+		t.mode=cells[cel][y][x]>0 and"erase"or"draw"
 		flood_fill(x,y)
 	end
 
@@ -1601,9 +1714,7 @@ end
 			end
 		end
 	end
-
 --=--=--=--=--=--=--=--=--=--=--=--=--
-
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- init
@@ -1616,33 +1727,34 @@ end
 		pad = bool and (CS < 4 and 0 or 1) or 0
 	end
 
-	function rand_cells(rst)
-		l_cells=0
-		if rst then pause(true)end
-		local c,b=cells[cur],0
-		for j=1,GH do
-			for i=1,GW do
-				b=rand()<0.5 and 1 or 0
-				c[j][i]=b
-				l_cells=l_cells+b
-			end
-		end
-	end
-
 	function create_cells()
-		local b1,b2,b3,b4={},{},{},{}
-		for j=0,GH+1 do
-			b1[j],b2[j],b3[j],b4[j]={},{},{},{}
-			for i=0,GW+1 do
-				b1[j][i],b2[j][i],b3[j][i],b4[j][i]=0,0,0,0
+		c1,c2,c3,c4={},{},{},{}
+		for j=0, GH+1 do
+			c1[j],c2[j],c3[j],c4[j]={},{},{},{}
+			for i=0, GW+1 do
+				c1[j][i],c2[j][i],c3[j][i],c4[j][i]=0,0,0,0
 			end
 		end
-		cells={b1,b2,b3,b4}
+		cells,pcells={c1,c2,c3},c4
 		l_cells,TOT_CELLS=0,GW*GH
 	end
 
+	function rand_cells(rst)
+		if rst then pause(true)end
+		fill_grid(false)
+		for j=1,GH do
+			for i=1,GW do
+				if rand()>0.5 then
+					cells[cel][j][i]=NEW_CELL
+					l_cells=l_cells+1
+				end
+			end
+		end
+		update_all_neighbors(c)
+	end
+
 	function save_board()
-		local c,sv=cells[cur],cells[sav]
+		local c,sv=cells[cel],cells[sav]
 		for j=1,GH do
 			for i=1,GW do
 				sv[j][i]=c[j][i]
@@ -1651,7 +1763,7 @@ end
 	end
 
 	function load_board()
-		local c,sv=cells[cur],cells[sav]
+		local c,sv=cells[cel],cells[sav]
 		for j=1,GH do
 			for i=1,GW do
 				c[j][i]=sv[j][i]
@@ -1660,12 +1772,14 @@ end
 	end
 
 	function fill_grid(fill)
-		local c,v=cells[cur],fill and 1 or 0
-		for j=0,GH+1 do
-			for i=0,GW+1 do
-				c[j][i]=v
+		local c,v,cj=cells[cel], fill and NEW_CELL or 0
+		for j=1,GH do
+			cj=c[j]
+			for i=1,GW do
+				cj[i]=v
 			end
 		end
+		if fill then update_all_neighbors()end
 		l_cells=(fill and GW*GH or 0)
 	end
 
@@ -1693,59 +1807,67 @@ end
 		tl.origin = vec0()
 		tl:init_pats()
 		-- create_cells()
-		set_zoom(opts[ZOOM_LVL],false,true) -- cells are created here
+		set_zoom(opts[ZOOM_LVL],false,true) -- cells[cel] are created here
 		if opts[RAND_START] then rand_cells() end
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
 
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- update
-	function swap_borders(c)
-		for j=1,GH do
-			c[j][GW+1],c[j][0]=c[j][1],c[j][GW]
-		end
-		for i=0,GW+1 do
-			c[GH+1][i]=c[1][i]
-			c[0][i]=c[GH][i]
-		end
-	end
-	-- the weirdness in here seems to have given me over 10ms and 20fps
-	local function compute_gen()
-		cur,pre=pre,cur
-		local lc,p,c=0,cells[pre],cells[cur]	-- count alive cells, and make buffers local
-		local l,r,n,b,cj,pj,pu,pd -- this seems to give me ~2ms (and more token budget)
+	local function compute_gen(     c,n,cj,pj,p,cell,lc)
+		c,lc=cells[cel],l_cells
+		p=copy_board(c)
 
 		for j=1,GH do
-			cj,pj,pu,pd=c[j],p[j],p[j-1],p[j+1] -- make buffer rows local here for faster access
+			pj,cj=p[j],c[j]
 			for i=1,GW do
-				l,r=i-1,i+1
-				-- count alive neighbors
-				n=pu[l]+pu[i]+pu[r]+pj[l]+pj[r]+pd[l]+pd[i]+pd[r]
-				-- apply rules
-				b=(n==3or(n==2 and pj[i]==1))and 1 or 0
-				cj[i]=b
-				lc=lc+b
+				cell=pj[i]
+				if cell>0 then
+					n=cell&COUNT
+					-- if cell&ALIVE~=0 then
+					if cell>=ALIVE then -- one op is faster than two
+						if n~=2 and n~=3 then
+							cj[i]=cj[i]&~ALIVE
+							update_neighbors(i,j,-NB)
+							lc=lc-1
+						end
+					else
+						if n==3 then
+							cj[i]=cj[i]|ALIVE
+							update_neighbors(i,j,NB)
+							lc=lc+1
+						end
+					end
+				end
 			end
 		end
 
-		if opts[WRAP_AROUND]then  -- swap borders
-			swap_borders(c)
-		end
 		l_cells,gens=lc,gens+1
 	end
 
+
+
 	local function update_ui()
-	bma("ui update",function()--@bm
+	bma("ui update",function()--start_bm
 		if state=="game"and tb_vis then
 			PlaybackBar("pb", pb_rect)
 			Toolbar("tb",tb_rect)
 		end
-	end)--@bm
+	end)--end_bm
+	end
+
+	local function update_gen_slow()
+	end
+	local function update_gen_normal()
+	end
+	local function update_gen_fast()
+
 	end
 
 	local function update()
-	bma("update",function()--@bm
+	bma("update",function()--start_bm
 		if state=="game"then
 			if mmoved() then
 				if tl.type~="copy"or tl.mode then
@@ -1755,13 +1877,27 @@ end
 			tl:draw_points(g_mx,g_my)
 			if tl.info then tl:show_info()end
 
-			bma("comput gen", function()
-				if not paused and (upd_delay==0 or f%upd_delay==0) then
-					compute_gen()
-				end
-			end) --@bm
+			-- bma("comput gen",function()--start_bm
+			-- 	if not paused and (upd_delay==0 or f%upd_delay==0) then
+			-- 		compute_gen()
+			-- 	end
+			-- end) --end_bm
+			if not paused then
+				buildup=speed>=0 and floor(buildup+speeds[speed]) or buildup+speeds[speed]
+				offset=speed>0 and f%2 or 0 -- this avoids oscilators looking static when sped up (f is from tm_check)
+				monitor("buildup",buildup,11)
+
+				bma("gen",function()
+					if buildup >= max(1, upf) then
+						for i=1,floor(buildup)+offset do
+							compute_gen()
+						end
+						buildup=0
+					end
+				end) --end_bm
+			end
 		end
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1772,29 +1908,29 @@ end
 		return((tl.mode=="erase" or tl.type=="cut")and thm.erase or(tl.type=="copy"and thm.select) or thm.preview)
 	end
 	local function render_rects()
-		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[dum],cells[cur],CS-pad,thm.cell,prevw_color()
+		local rect,s,c,rs,ca,cs,sj,cj,x,y=rect,cells[dum],cells[cel],CS-pad,thm.cell,prevw_color()
 		for j=1,GH do
 			y=(j-1)*CS+pad
 			sj,cj=s[j],c[j]
 			for i=1,GW do
 				x=(i-1)*CS+pad
-				if sj[i]==1 and not ui.mouse_on_ui then rect(x,y,rs,rs,cs)
-				elseif cj[i]==1 then rect(x,y,rs,rs,ca)
+				if sj[i]==1 then rect(x,y,rs,rs,cs)
+				elseif cj[i]>=ALIVE then rect(x,y,rs,rs,ca)
 				end
 			end
 		end
-		if not tl.mode and not ui.mouse_on_ui then
+		if not tl.mode and not ui.mouse_on_ui and tl.type~="patt" then
 			rect((g_mx-1)*CS+pad,(g_my-1)*CS+pad,CS-pad,CS-pad,cs)
 		end
 	end
 
 	local function render_pix()
-		local pix,s,c,ca,cs,sj,cj,y=pix,cells[dum],cells[cur],thm.cell,prevw_color()
+		local pix,s,c,ca,cs,sj,cj,y=pix,cells[dum],cells[cel],thm.cell,prevw_color()
 		for j=1,GH do
 			y,sj,cj=j-1,s[j],c[j]
 			for i=1,GW do
 				if sj[i]==1 then pix(i-1,y,cs)
-				elseif cj[i]==1 then pix(i-1,y,ca)
+				elseif cj[i]>=ALIVE then pix(i-1,y,ca)
 				end
 			end
 		end
@@ -1804,14 +1940,14 @@ end
 	end
 
 	local function render_ui()
-	bma("ui_render",function()--@bm
+	bma("ui_render",function()--start_bm
 		if info_vis then
 			GenInfo()
 		end
 		if opts[USE_TLTIPS] and tb_vis then
 			ToolTip()
 		end
-	end)--@bm
+	end)--end_bm
 	end
 
 	local function draw_game()
@@ -1892,14 +2028,14 @@ end
 	end
 
 	local function render()
-	bma("render",function()--@bm
+	bma("render",function()--start_bm
 		cls(thm.bg)
 		-- cls(2)
 		if     state=="game"then draw_game()
 		elseif state~="options"then draw_help()
 		else draw_options()
 		end
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -2012,12 +2148,12 @@ end
 	end
 
 	local function input()
-	bma("input",function()--@bm
+	bma("input",function()--start_bm
 		if not ui.mouse_on_ui then
 			handle_mouse()
 		end
 		handle_keys()
-	end)--@bm
+	end)--end_bm
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -2026,11 +2162,15 @@ end
 -- Unsorted stuff
 
 	function inc_speed()
-		upd_delay=clamp(upd_delay-1,0,100)
+		-- upd_delay=clamp(upd_delay-1,0,100)
+		speed=min(speed+1,MAX_SPEED)
+		upf=speeds[speed]
 	end
 
 	function dec_speed()
-		upd_delay=clamp(upd_delay+1,0,100)
+		-- upd_delay=clamp(upd_delay+1,0,100)
+		speed=max(speed-1,-MAX_SPEED)
+		upf=speeds[speed]
 	end
 
 	function toggle_ui()
@@ -2081,7 +2221,7 @@ end
 
 
 function TIC()
-bma("Total",function()--@bm
+bma("Total",function()--start_bm
 	tm_check()
 	update_mst()
 
@@ -2096,7 +2236,7 @@ bma("Total",function()--@bm
 
 	ui.end_frame()
 	dbg:draw()
-end)--@bm
+end)--end_bm
 end
 
 
