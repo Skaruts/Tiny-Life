@@ -648,7 +648,7 @@
 -- setup
 
 	-- fwd decls
-	local tl,rand_cells,set_wrap
+	local tl,rand_cells
 
 
 	-- in-game persistent options / load values or defaults
@@ -702,7 +702,7 @@
 		opts[i]=b
 		if not webv then pmem(i,b and 1 or 0)end
 		if i==USE_PADDING then set_padding(b)
-		elseif i==WRAP_AROUND then set_wrap()
+		elseif i==WRAP_AROUND then set_wrap(b)
 		end
 	end
 
@@ -725,6 +725,7 @@
 	local speeds={[-5]=1/32,[-4]=1/16,[-3]=1/8,[-2]=1/4,[-1]=1/2,[0]=1,2,4,8,16,32}
 	local speed_names={"/32","/16","/8","/4","/2","x1","x2","x4","x8","x16","x32"}
 	local MAX_SPEED=5
+
 	local cats={
 		"Statics",
 		"Oscilators",
@@ -801,11 +802,12 @@
 	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
+--=--=--=--=--=--=--=--=--=--=--=--=--
+-- cell stuff
+	local function inbounds(x,y)
+		return x>0 and x<=GW and y>0 and y<=GH
+	end
 
-
-local function inbounds(x,y)
-	return x>0 and x<=GW and y>0 and y<=GH
-end
 	local pcells={}  -- reuse array to not trigger GC
 	local function copy_board(c)
 		local t,tj,cj=pcells
@@ -860,19 +862,29 @@ end
 
 	local update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
 
-	function set_wrap(b)
-		update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
-	end
-
-	local function update_all_neighbors()
-		local c=cells[cel]
+	local function update_all_neighbors(clear)
+		local c,cj=cells[cel]
+		if clear then
+			for j=1,GH do
+				cj=c[j]
+				for i=1,GW do
+					cj[i]=cj[i]&~COUNT
+				end
+			end
+		end
 		for j=1,GH do
+			cj=c[j]
 			for i=1,GW do
-				if c[j][i]>=ALIVE then
+				if cj[i]>=ALIVE then
 					update_neighbors(i,j,NB)
 				end
 			end
 		end
+	end
+
+	function set_wrap(b)
+		update_neighbors = b and upd_neighbs_wrap or upd_neighbs_nowrap
+		update_all_neighbors(true)
 	end
 
 	local function revive(x,y)
@@ -890,6 +902,8 @@ end
 		update_neighbors(x,y,-NB)
 		l_cells=l_cells-1
 	end
+--=--=--=--=--=--=--=--=--=--=--=--=--
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
 	local pb_rect={x=240//2-76//2,  y=-2,             w=76,  h=10}
@@ -1727,7 +1741,7 @@ end
 
 	function rand_cells(rst)
 		if rst then pause(true)end
-		fill_grid(false)
+		clear_grid(false)
 		for j=1,GH do
 			for i=1,GW do
 				if rand()>0.5 then
@@ -1757,7 +1771,7 @@ end
 		end
 	end
 
-	function fill_grid(fill)
+	function clear_grid(fill)
 		local c,v,cj=cells[cel], fill and NEW_CELL or 0
 		for j=1,GH do
 			cj=c[j]
@@ -2065,7 +2079,7 @@ end
 				elseif keyp(k.A)then tl:flip("h")
 				elseif keyp(k.Z)then tl:flip("v")
 				elseif keyp(k.C)then
-					if shift then fill_grid(false)
+					if shift then clear_grid(false)
 					else tl:switch(ctrl and"copy"or"circ")
 					end
 				elseif keyp(k.X)and ctrl then tl:switch("cut")
@@ -2080,7 +2094,7 @@ end
 					end
 				elseif keyp(k.R)then tl:switch("rect")
 				elseif keyp(k.F)then
-					if shift then fill_grid(true)
+					if shift then clear_grid(true)
 					else tl:switch("fill")
 					end
 				elseif keyp(k.W,10,5)then
@@ -2198,7 +2212,7 @@ end
 
 	function reset()
 		gens = 0
-		-- fill_grid(false)
+		-- clear_grid(false)
 		load_board()
 		stopped=true
 	end
