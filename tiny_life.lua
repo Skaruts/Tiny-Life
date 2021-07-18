@@ -5,18 +5,12 @@
 -- script: lua
 -- input: mouse, keyboard
 -- saveid: TinyLife
--- version 1.3
+-- version 1.4
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- MIT License (c) 2019 Skaruts (MetalDudeBro)
 --=--=--=--=--=--=--=--=--=--=--=--=--
--- RESEARCH:
---    http://www.mirekw.com/ca/ca_files_formats.html
---    https://www.ibiblio.org/lifepatterns/
---
---    fast life algorithms:
---        https://stackoverflow.com/questions/3554552/game-of-life-memory-optimization
---            - https://stackoverflow.com/a/6164868
---            - https://www.ibiblio.org/lifepatterns/lifeapplet.html
+
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- utils & shortenings
 	local ins,sort,rem,conc,unpk=table.insert,table.sort,table.remove,table.concat,table.unpack
@@ -39,7 +33,7 @@
 
 	--[[ array2 - make new 2d array with 'v'   002 ]] function array2(w,h,v) v=v or 0 local t={} for j=1,h do t[j]={} for i=1,w do t[j][i]=v end end return t end
 
-	--[[ rotate/flip 2d arrays (WIP)           000 ]]
+	--[[ rotate/flip 2d arrays (WIP)           001 ]]
 		function rot90(inp)
 			local w,h=#inp[1],#inp
 			local out=array2(h,w)
