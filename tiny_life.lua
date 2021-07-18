@@ -660,6 +660,11 @@
 			)
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- setup
+
+	-- fwd decls
+	local tl,rand_cells,set_wrap
+
+
 	-- in-game persistent options / load values or defaults
 	local webv=false
 	local opts,PALM={true,true,false,false,1,[9]=true},0x03FC0
@@ -710,14 +715,16 @@
 		local b=not opts[i]
 		opts[i]=b
 		if not webv then pmem(i,b and 1 or 0)end
-		if i==USE_PADDING then set_padding(b)end
+		if i==USE_PADDING then set_padding(b)
+		elseif i==WRAP_AROUND then set_wrap()
+		end
 	end
 
 	local upd_delay=0
 	local g_mx,g_my,g_lmx,g_lmy=0,0,0,0 -- grid mouse pos
 	local ctrl,shift,alt=false,false,false
 
-	local cel,dum,sav=1,2,3,4 -- prev/curr/dummy,saved buffer indices
+	local cel,dum,sav=1,2,3 -- real cells / dummy cells / saved cell indices
 	local cells={} -- cell buffers
 	local CS,GW,GH=8//opts[ZOOM_LVL], 30*opts[ZOOM_LVL], 17*opts[ZOOM_LVL] -- cell size, grid width/height
 
@@ -725,6 +732,9 @@
 	local paused,stopped,do_wrap=true,true
 	local l_cells,gens,TOT_CELLS,NB,NEW_CELL=0,0,0,2,1 -- living cells[cel] / generations
 	local NUM_HELP_SCRS,state=4,"game"
+
+	local ALIVE,COUNT,NB=1<<4,0xf,1
+	local NEW_CELL=ALIVE
 
 	local cats={
 		"Statics",
@@ -802,41 +812,31 @@
 	}
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
--- fwd decls
-local tl,rand_cells
+
 
 local function inbounds(x,y)
 	return x>0 and x<=GW and y>0 and y<=GH
 end
-	local function clear_borders()
+	local pcells={}  -- reuse array to not trigger GC
+	local function copy_board(c)
+		local t,tj,cj=pcells
 		for j=1,GH do
+			tj,cj=t[j],c[j]
 			for i=1,GW do
-				if i==0 or j==0 or i==GW+1 or j==GH+1 then
-					cells[cel][j][i]=0
-				end
+				tj[i]=cj[i]
 			end
 		end
+		return t
 	end
 
-
-	local function update_own_nb_count(x,y,n,    l,r,u,d,cy,cu,cd)
-		l,r,u,d=x-1,x+1,y-1,y+1
-		cy,cu,cd=cells[cel][y],cells[cel][u],cells[cel][d]
-
-		-- cy[x]=cy[x]+
-		if cu[l]&1==1 then cy[x]=cy[x]+n end
-		if cu[x]&1==1 then cy[x]=cy[x]+n end
-		if cu[r]&1==1 then cy[x]=cy[x]+n end
-		if cy[l]&1==1 then cy[x]=cy[x]+n end
-		if cy[r]&1==1 then cy[x]=cy[x]+n end
-		if cd[l]&1==1 then cy[x]=cy[x]+n end
-		if cd[x]&1==1 then cy[x]=cy[x]+n end
-		if cd[r]&1==1 then cy[x]=cy[x]+n end
-	end
-
-	local function update_neighbors(x,y,n,    l,r,u,d,cy,cu,cd)
-		l,r,u,d=x-1,x+1,y-1,y+1
-		cy,cu,cd=cells[cel][y],cells[cel][u],cells[cel][d]
+	local function upd_neighbs_wrap(x,y,n)
+		local l,r,u,d=x-1,x+1,y-1,y+1
+		if     l < 1  then l = GW
+		elseif r > GW then r = 1 end
+		if     u < 1  then u = GH
+		elseif d > GH then d = 1 end
+		local c=cells[cel]
+		local cy,cu,cd=c[y],c[u],c[d]
 
 		cu[l] = cu[l] + n
 		cu[x] = cu[x] + n
@@ -846,61 +846,61 @@ end
 		cd[l] = cd[l] + n
 		cd[x] = cd[x] + n
 		cd[r] = cd[r] + n
-
-
-
 	end
 
-	local function update_all_neighbors(c)
+	local function upd_neighbs_nowrap(x,y,n)
+		local l,r,u,d=x-1,x+1,y-1,y+1
+		local c=cells[cel]
+		local cy,cu,cd=c[y],c[u],c[d]
+
+		if u>=1 then
+			if l >= 1 then cu[l] = cu[l] + n end
+			cu[x] = cu[x] + n
+			if r <= GW then cu[r] = cu[r] + n end
+		end
+
+		if l >= 1 then  cy[l] = cy[l] + n end
+		if r <= GW then cy[r] = cy[r] + n end
+
+		if d<=GH then
+			if l >= 1 then cd[l] = cd[l] + n end
+			cd[x] = cd[x] + n
+			if r <= GW then cd[r] = cd[r] + n end
+		end
+	end
+
+	local update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
+
+	function set_wrap(b)
+		update_neighbors = opts[WRAP_AROUND] and upd_neighbs_wrap or upd_neighbs_nowrap
+	end
+
+	local function update_all_neighbors()
+		local c=cells[cel]
 		for j=1,GH do
 			for i=1,GW do
-				if c[j][i]&1==1 then
+				if c[j][i]>=ALIVE then
 					update_neighbors(i,j,NB)
 				end
 			end
 		end
 	end
 
-	local function swap_vert_borders(c)
-		if not opts[WRAP_AROUND] then return end
-		c[GH+1]=c[ 1]
-		c[   0]=c[GH]
+	local function revive(x,y)
+		local cy= cells[cel][y]
+		if cy[x]>=ALIVE then return end
+		cy[x]=cy[x]|ALIVE
+		update_neighbors(x,y,NB)
+		l_cells=l_cells+1
 	end
 
-	local function swap_horz_borders(c)
-		if not opts[WRAP_AROUND] then return end
-		local ost,st,cj,cju,cjd
-		for j=1,GH do
-			cj,cju,cjd=c[j],c[j-1],c[j+1]
-
-			ost,st=cj[0]&1==1,cj[GW]&1==1 -- old state, state
-			cj[0]=cj[GW]
-			if not ost and st then
-				cj[1],cju[1],cjd[1]=cj[1]+NB,cju[1]+NB,cjd[1]+NB
-			elseif ost and not st then
-				cj[1],cju[1],cjd[1]=cj[1]-NB,cju[1]-NB,cjd[1]-NB
-			end
-			ost,st=cj[GW+1]&1==1,cj[1]&1==1
-			cj[GW+1]=cj[1]
-			if not ost and st then
-				cj[GW],cju[GW],cjd[GW]=cj[GW]+NB,cju[GW]+NB,cjd[GW]+NB
-			elseif ost and not st then
-				cj[GW],cju[GW],cjd[GW]=cj[GW]-NB,cju[GW]-NB,cjd[GW]-NB
-			end
-		end
+	local function kill(x,y)
+		local cy= cells[cel][y]
+		if cy[x]<ALIVE then return end
+		cy[x]=cy[x]&~ALIVE
+		update_neighbors(x,y,-NB)
+		l_cells=l_cells-1
 	end
-
-	-- local function set_cell(x,y)
-	-- 	cells[cel][y][x]=cells[cel][y][x]|1
-	-- 	update_neighbors(x,y,NB)
-	-- 	swap_horz_borders(cells[cel])
-	-- end
-
-	-- local function erase_cell(x,y)
-	-- 	cells[cel][y][x]=cells[cel][y][x]&~1
-	-- 	update_neighbors(x,y,-NB)
-	-- 	swap_horz_borders(cells[cel])
-	-- end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- GUI
 	local pb_rect={x=240//2-76//2,  y=-2,             w=76,  h=10}
@@ -1183,7 +1183,7 @@ end
 			or s[y][x]==1
 		else
 			return x<1 or y<1 or x>GW or y>GH
-			or s[y][x]==1 or c[y][x]&1==v
+			or s[y][x]==1 or c[y][x]&ALIVE==v
 		end
 	end
 
@@ -1236,7 +1236,7 @@ end
 	end
 
 	local function flood_fill(x,y,tmp)
-		scnln_ft(x,y,tmp or false,tl.mode=="draw"and 1 or 0)
+		scnln_ft(x,y,tmp or false, tl.mode=="draw"and ALIVE or 0)
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
@@ -1316,21 +1316,22 @@ end
 	end
 
 	function tl.copy(t)
-		local cb,c,r,cj,cbj={},cells[cel],tl:_base_rect(g_mx,g_my)
+		local cb,c,r,cj,cbj,x,y={},cells[cel],tl:_base_rect(g_mx,g_my)
 		for j=0,r.h-1 do
 			cbj,cj={},c[j+r.y]
 			for i=0,r.w-1 do
-				cbj[i]=cj[i+r.x]&1==1 and 1 or 0
+				cbj[i]=cj[i+r.x]>=ALIVE and 1 or 0
 			end
 			cb[j]=cbj
 		end
 		t.clipboard=cb
 		if tl.type=="cut" then
 			for j=0,r.h-1 do
-				cj=c[j+r.y]
+				y=j+r.y
+				cj=c[y]
 				for i=0,r.w-1 do
-					cj[i+r.x]=cj[i+r.x]&~1
-					update_neighbors(i+r.x,j+r.y,-NB)
+					x=i+r.x
+					kill(x,y)
 				end
 			end
 		end
@@ -1350,33 +1351,18 @@ end
 				for j=1,GH do
 					sj,cj=s[j],c[j]
 					for i=1,GW do
-						if sj[i]==1then
-							ov=cj[i]&1==1
-							cj[i]=cj[i]|1
-							if not ov then
-								update_neighbors(i,j,NB)
-							end
-							-- update_own_nb_count(i,j,NB)
-						end
+						if sj[i]==1 then revive(i,j) end
 					end
 				end
 			else
 				for j=1,GH do
 					sj,cj=s[j],c[j]
 					for i=1,GW do
-						if sj[i]==1then
-							ov=cj[i]&1==1
-							cj[i]=cj[i]&~1
-							if ov then
-								update_neighbors(i,j,-NB)
-							end
-							-- update_own_nb_count(i,j,NB)
-						end
+						if sj[i]==1 then kill(i,j) end
 					end
 				end
 			end
 
-			if opts[WRAP_AROUND]then swap_horz_borders(c)end
 			if cancel then t:stop()end
 			t.do_update=true
 			t.info=nil
@@ -1720,8 +1706,6 @@ end
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- init
-
-
 	function toggle_padding()
 		toggle_opt(USE_PADDING)
 		set_padding(opts[USE_PADDING])
@@ -1732,36 +1716,29 @@ end
 	end
 
 	function create_cells()
-		c1,c2,c3={},{},{}
+		c1,c2,c3,c4={},{},{},{}
 		for j=0, GH+1 do
-			c1[j]={}
-			c2[j]={}
-			c3[j]={}
+			c1[j],c2[j],c3[j],c4[j]={},{},{},{}
 			for i=0, GW+1 do
-				c1[j][i] = 0
-				c2[j][i] = 0
-				c3[j][i] = 0
+				c1[j][i],c2[j][i],c3[j][i],c4[j][i]=0,0,0,0
 			end
 		end
-		cells={c1,c2,c3}
-		swap_vert_borders(cells[cel])
+		cells,pcells={c1,c2,c3},c4
 		l_cells,TOT_CELLS=0,GW*GH
 	end
 
 	function rand_cells(rst)
 		if rst then pause(true)end
-		create_cells()  -- seems required for wrap around to work
-		local c,b=cells[cel],0
+		fill_grid(false)
 		for j=1,GH do
 			for i=1,GW do
-				b=rand()<0.5 and NEW_CELL or 0
-				-- c[j][i]=b
-				cells[cel][j][i]=b
-				l_cells=l_cells+(b==NEW_CELL and 1 or 0)
+				if rand()>0.5 then
+					cells[cel][j][i]=NEW_CELL
+					l_cells=l_cells+1
+				end
 			end
 		end
 		update_all_neighbors(c)
-		swap_horz_borders(c)
 	end
 
 	function save_board()
@@ -1783,15 +1760,14 @@ end
 	end
 
 	function fill_grid(fill)
-		local c,f,v=cells[cel],fill and set_cell or erase_cell, fill and NEW_CELL or 0
-		-- clear_borders()
+		local c,v,cj=cells[cel], fill and NEW_CELL or 0
 		for j=1,GH do
+			cj=c[j]
 			for i=1,GW do
-				cells[cel][j][i]=v
+				cj[i]=v
 			end
 		end
-		-- if fill then update_all_neighbors()end
-		-- swap_horz_borders()
+		if fill then update_all_neighbors()end
 		l_cells=(fill and GW*GH or 0)
 	end
 
@@ -1824,39 +1800,12 @@ end
 	end
 --=--=--=--=--=--=--=--=--=--=--=--=--
 
-	local function copy_board(c)
-		local t,tj,cj={}
-		for j=1,GH do
-			tj,cj={},c[j]
-			for i=1,GW do
-				tj[i]=cj[i]
-			end
-			t[j]=tj
-		end
-		return t
-	end
-
 
 
 --=--=--=--=--=--=--=--=--=--=--=--=--
 -- update
-
-
-	function toggle_wrap(b)
-		dowrap=not dowrap
-		if dowrap then
-			-- update_all_neighbors()
-			-- swap_vert_borders()
-			-- swap_horz_borders()
-		else
-			clear_borders()
-		end
-	end
-
-
-
 	local function compute_gen(     c,n,cj,pj,p,cell,lc)
-		c,lc=cells[cel],0
+		c,lc=cells[cel],l_cells
 		p=copy_board(c)
 
 		for j=1,GH do
@@ -1864,15 +1813,17 @@ end
 			for i=1,GW do
 				cell=pj[i]
 				if cell>0 then
-					n=cell>>1
-					if cell&1==1 then
+					n=cell&COUNT
+					-- if cell&ALIVE~=0 then
+					if cell>=ALIVE then -- one op is faster than two
 						if n~=2 and n~=3 then
-							cj[i]=cj[i]&~1
+							cj[i]=cj[i]&~ALIVE
 							update_neighbors(i,j,-NB)
+							lc=lc-1
 						end
 					else
 						if n==3 then
-							cj[i]=cj[i]|1
+							cj[i]=cj[i]|ALIVE
 							update_neighbors(i,j,NB)
 							lc=lc+1
 						end
@@ -1880,7 +1831,7 @@ end
 				end
 			end
 		end
-		swap_horz_borders(c)
+
 		l_cells,gens=lc,gens+1
 	end
 
@@ -1929,8 +1880,8 @@ end
 			sj,cj=s[j],c[j]
 			for i=1,GW do
 				x=(i-1)*CS+pad
-				if sj[i]==1 and not ui.mouse_on_ui then rect(x,y,rs,rs,cs)
-				elseif cj[i]&1==1 then rect(x,y,rs,rs,ca)
+				if sj[i]==1 then rect(x,y,rs,rs,cs)
+				elseif cj[i]>=ALIVE then rect(x,y,rs,rs,ca)
 				end
 			end
 		end
@@ -1945,8 +1896,7 @@ end
 			y,sj,cj=j-1,s[j],c[j]
 			for i=1,GW do
 				if sj[i]==1 then pix(i-1,y,cs)
-				elseif cj[i]&1==1 then pix(i-1,y,ca)
-				-- else pix(i-1,y,7)
+				elseif cj[i]>=ALIVE then pix(i-1,y,ca)
 				end
 			end
 		end
